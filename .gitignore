@@ -1,0 +1,9 @@
+Makefile
+__pycache__/
+.vscode/
+help/
+i18n/
+icons/
+scipts/
+test/
+pb_tools.cfg/
