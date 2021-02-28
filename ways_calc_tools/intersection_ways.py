@@ -22,10 +22,19 @@
 """
 
 from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication, Qt, QObject
-from qgis.PyQt.QtGui import QIcon
+from qgis.PyQt.QtGui import QIcon, QColor
 from qgis.PyQt.QtWidgets import QAction, QTableWidgetItem
-from qgis.core import QgsProject, QgsVectorLayer, QgsWkbTypes, QgsRectangle, QgsMapLayerProxyModel
-from qgis.gui import QgsMapToolEmitPoint
+from qgis.core import (
+    QgsProject,
+    QgsVectorLayer,
+    QgsWkbTypes, QgsRectangle,
+    QgsMapLayerProxyModel,
+    QgsGeometry
+)
+from qgis.gui import (
+        QgsMapToolEmitPoint,
+        QgsHighlight
+)
 # Initialize Qt resources from file resources.py
 
 # Import the code for the DockWidget
@@ -45,6 +54,8 @@ class IntersectionWays:
         self.layer_ways = None
         self.layer_current = None
         self.layer_current_selected_fs = None
+
+        self.mapclicked_h_list = []
         # self.dockwidget.show()
 
         self.onLoadModule()
@@ -56,9 +67,31 @@ class IntersectionWays:
     def onUnLoadModule(self):
         print('unloadModule')
         self.map_clicked_dlg.tableClickedWays.itemSelectionChanged.disconnect(self.onMapClickedTableSeChanged)
+        self.clearMapselectedHighlight()
 
     def onMapClickedTableSeChanged(self):
         print('aaaa')
+        cur_row_index = self.map_clicked_dlg.tableClickedWays.currentRow()
+        if cur_row_index > -1:
+            self.clearMapselectedHighlight()
+
+            f_geometry = QgsGeometry()
+            f_geometry = QgsGeometry.fromWkt(
+                    self.map_clicked_dlg.tableClickedWays.item(cur_row_index, 1).text())
+
+            h = QgsHighlight(self.iface.mapCanvas(), f_geometry, self.layer_current)
+            h.setColor(QColor(0,100,200,220))
+            h.setWidth(6)
+            h.setFillColor(QColor(0,150,200,150))
+            self.mapclicked_h_list.append(h)
+            
+            
+
+
+    def clearMapselectedHighlight(self):
+        for i, h in enumerate(self.mapclicked_h_list):
+            self.mapclicked_h_list.pop(i)
+            self.iface.mapCanvas().scene().removeItem(h)
 
     def __del__(self):
         print('deleted')
@@ -113,6 +146,9 @@ class IntersectionWays:
                                                 self.layer_current, table)
 
         self.map_clicked_dlg.show()
+        result = self.map_clicked_dlg.exec_()
+        if not result:
+            self.clearMapselectedHighlight()
 
 
     # def showClickedFeaturesList(self):

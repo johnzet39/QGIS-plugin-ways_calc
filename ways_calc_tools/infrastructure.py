@@ -40,6 +40,7 @@ class CommonTools:
     def populateTableByClickedFeatures(layer, table):
         header_labels_list = []
         header_labels_list.append('feature_id')
+        header_labels_list.append('geometry')
         field_aliases_dict = layer.attributeAliases()
         for k in field_aliases_dict.keys():
             field = field_aliases_dict[k] if field_aliases_dict[k] else k
@@ -49,6 +50,7 @@ class CommonTools:
         for feature in layer.selectedFeatures():
             feature_attributes_dict = {}
             feature_attributes_dict["feature_id"]=feature.id()
+            feature_attributes_dict["geometry"]=feature.geometry().asWkt()
             for field_name in field_aliases_dict.keys():
                 feature_attributes_dict[field_name] = feature[field_name]
             layer_current_selected_fs.append(feature_attributes_dict)
@@ -68,4 +70,5 @@ class CommonTools:
         table.setHorizontalHeaderLabels(header_labels_list)
         table.resizeColumnsToContents()
         table.setColumnHidden(0, True)
+        table.setColumnHidden(1, True)
         return layer_current_selected_fs
