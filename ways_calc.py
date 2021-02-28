@@ -110,7 +110,7 @@ class WaysCalc:
         # setPopupMode: DelayedPopup, MenuButtonPopup, InstantPopup
         self.toolButton.setPopupMode(QToolButton.InstantPopup)
         self.toolButton.setAutoRaise(True)
-        self.iface.addToolBarWidget(self.toolButton)
+        self.toolButton_action = self.iface.addToolBarWidget(self.toolButton)
 
         self.action_intersection = QAction(
                 QIcon(":/plugins/ways_calc/icon.png"),
@@ -152,6 +152,8 @@ class WaysCalc:
         self.iface.removePluginMenu(u"Маршрутная сеть", self.action_intersection)
         self.iface.removePluginMenu(u"Маршрутная сеть", self.action_initLayerWays)
         self.iface.removeToolBarIcon(self.action_intersection)
+        self.iface.removeToolBarIcon(self.toolButton_action)
+
         #print "** UNLOAD WaysCalc"
         self.action_intersection.triggered.disconnect(self.run_intersection) # пересекающиеся маршруты
         self.action_initLayerWays.triggered.disconnect(self.run_initLayerWays) # выбор слоя сравнения
