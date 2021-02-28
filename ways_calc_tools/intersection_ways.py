@@ -60,17 +60,27 @@ class IntersectionWays:
 
         self.onLoadModule()
 
+
     def onLoadModule(self):
         print('loadModule')
         self.map_clicked_dlg.tableClickedWays.itemSelectionChanged.connect(self.onMapClickedTableSeChanged)
+        self.dockWidget.visibilityChanged.connect(self.onDockVisibilityChanged)
+
 
     def onUnLoadModule(self):
         print('unloadModule')
         self.map_clicked_dlg.tableClickedWays.itemSelectionChanged.disconnect(self.onMapClickedTableSeChanged)
+        self.dockWidget.visibilityChanged.disconnect(self.onDockVisibilityChanged)
+        
         self.clearMapselectedHighlight()
 
+
+    def onDockVisibilityChanged(self):
+        if self.dockWidget.isHidden():
+            self.clearMapselectedHighlight()
+            self.layer_current.removeSelection()
+
     def onMapClickedTableSeChanged(self):
-        print('aaaa')
         cur_row_index = self.map_clicked_dlg.tableClickedWays.currentRow()
         if cur_row_index > -1:
             self.clearMapselectedHighlight()
@@ -84,8 +94,6 @@ class IntersectionWays:
             h.setWidth(6)
             h.setFillColor(QColor(0,150,200,150))
             self.mapclicked_h_list.append(h)
-            
-            
 
 
     def clearMapselectedHighlight(self):
@@ -93,8 +101,10 @@ class IntersectionWays:
             self.mapclicked_h_list.pop(i)
             self.iface.mapCanvas().scene().removeItem(h)
 
+
     def __del__(self):
         print('deleted')
+
 
     def initLayerWays(self, current_layer = None):
         self.sel_layer_dlg.mMapLayerComboBox.setFilters(QgsMapLayerProxyModel.LineLayer)
@@ -145,9 +155,13 @@ class IntersectionWays:
         self.layer_current_selected_fs = CommonTools.populateTableByClickedFeatures(
                                                 self.layer_current, table)
 
+        self.layer_current.removeSelection()
         self.map_clicked_dlg.show()
         result = self.map_clicked_dlg.exec_()
-        if not result:
+        if result:
+            
+            self.dockWidget.show()
+        else:
             self.clearMapselectedHighlight()
 
 
