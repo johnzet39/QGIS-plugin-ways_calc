@@ -1,12 +1,33 @@
 {
-    "layers": {
-        "Маршрутная сеть": {
-            "filters_fields": {
-                "company": {
-                    
+    "modules":{
+        "intersection_ways": {
+            "layers": {
+                "Маршрутная сеть": {
+                    "filters_fields": {
+                        "percent": {
+                            "label": "Минимальный процент пересечения",
+                            "source_type": "custom",
+                            "widget_type": "QSpinBox",
+                            "widget_options":{
+                                "setMaximum": "100",
+                                "setMinimum": "0",
+                                "setSingleStep": "5",
+                                "setSuffix": "%)"                            }
+                        },
+                        "company": {
+                            "label": "Компания",
+                            "source_type": "own",
+                            "widget_type": "QListBox",
+                            "widget_options":{
+                                
+                            }
+                        }
+
+                    }
                 }
             }
         }
     }
+    
         
 }

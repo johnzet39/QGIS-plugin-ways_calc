@@ -21,8 +21,11 @@
  ***************************************************************************/
 """
 
+from PyQt5.QtCore import QVariant
+from PyQt5.QtWidgets import QListWidget, QListWidgetItem
 from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication, Qt, QObject
 from qgis.PyQt.QtGui import QIcon, QColor
+from qgis.PyQt import QtWidgets
 from qgis.PyQt.QtWidgets import QAction, QTableWidgetItem
 from qgis.core import (
     QgsProject,
@@ -39,25 +42,30 @@ from qgis.gui import (
 
 # Import the code for the DockWidget
 from ..ways_calc_select_layers_dialog import WaysCalcSelectLayerDialog
-from ..station_ways_click_res_dialog import WaysCalcClickResDialog
+from ..ways_calc_click_res_dialog import WaysCalcClickResDialog
 from .infrastructure import CommonTools
+
+import json
+import os
 
 class IntersectionWays:
     def __init__(self, iface, dockWidget):
         self.iface = iface
         self.dockWidget = dockWidget
+        self.plugin_dir = os.path.dirname(__file__)
         print('init')
 
         self.map_clicked_dlg = WaysCalcClickResDialog()
         self.sel_layer_dlg = WaysCalcSelectLayerDialog()
 
-        self.layer_ways = None
-        self.layer_current = None
-        self.layer_current_selected_fs = None
+        self.inters_layer = None # слой сравнения
+        self.current_layer = None # текущий выбранный слой
+        self.current_layer_selected_fs = None # объекты, которые попали под курсор на карте (лист словарей)
+
+        self.settings = None
+        self.settings_layer = None
 
         self.mapclicked_h_list = []
-        # self.dockwidget.show()
-
         self.onLoadModule()
 
 
@@ -65,6 +73,7 @@ class IntersectionWays:
         print('loadModule')
         self.map_clicked_dlg.tableClickedWays.itemSelectionChanged.connect(self.onMapClickedTableSeChanged)
         self.dockWidget.visibilityChanged.connect(self.onDockVisibilityChanged)
+        self.initSettings()
 
 
     def onUnLoadModule(self):
@@ -74,11 +83,15 @@ class IntersectionWays:
         
         self.clearMapselectedHighlight()
 
+    def initSettings(self):
+        with open(os.path.join(self.plugin_dir, "..\settings.json"), "r") as read_file:
+            self.settings = json.load(read_file)
+
 
     def onDockVisibilityChanged(self):
         if self.dockWidget.isHidden():
             self.clearMapselectedHighlight()
-            self.layer_current.removeSelection()
+            self.current_layer.removeSelection()
 
     def onMapClickedTableSeChanged(self):
         cur_row_index = self.map_clicked_dlg.tableClickedWays.currentRow()
@@ -89,7 +102,7 @@ class IntersectionWays:
             f_geometry = QgsGeometry.fromWkt(
                     self.map_clicked_dlg.tableClickedWays.item(cur_row_index, 1).text())
 
-            h = QgsHighlight(self.iface.mapCanvas(), f_geometry, self.layer_current)
+            h = QgsHighlight(self.iface.mapCanvas(), f_geometry, self.current_layer)
             h.setColor(QColor(0,100,200,220))
             h.setWidth(6)
             h.setFillColor(QColor(0,150,200,150))
@@ -114,7 +127,7 @@ class IntersectionWays:
         self.sel_layer_dlg.show()
         result = self.sel_layer_dlg.exec_()
         if result:
-            self.layer_ways = self.sel_layer_dlg.mMapLayerComboBox.currentLayer()
+            self.inters_layer = self.sel_layer_dlg.mMapLayerComboBox.currentLayer()
 
 
     def checkLayers(self):
@@ -122,83 +135,130 @@ class IntersectionWays:
         if (current_layer is not None and
                 type(current_layer) == QgsVectorLayer and
                 current_layer.geometryType() ==  QgsWkbTypes.LineGeometry):
-            self.layer_current = current_layer
+            self.current_layer = current_layer
         else:
             self.iface.messageBar().pushMessage(f'Выберите векторный линейный слой, содержащий объект сравнения', f'', duration=5, level=2)
             return False
 
-        if self.layer_ways is None:
+        if self.inters_layer is None:
             self.initLayerWays(current_layer)
 
-        if self.layer_current is None or self.layer_ways is None:
+        if self.current_layer is None or self.inters_layer is None:
             return False
         return True
     
     
     def insersection_take_way(self, point):
-        self.layer_current.removeSelection()
+        self.current_layer.removeSelection()
         width = self.iface.mapCanvas().mapUnitsPerPixel() * 5
         rect = QgsRectangle(point.x() - width,
             point.y() - width,
             point.x() + width,
             point.y() + width)
-        self.layer_current.selectByRect(rect)
+        self.current_layer.selectByRect(rect)
 
-        if self.layer_current.selectedFeatureCount() > 0:
+        if self.current_layer.selectedFeatureCount() > 0:
             # self.iface.messageBar().clearWidgets()
             self.showClickedFeaturesList()
 
 
     def showClickedFeaturesList(self):
         table = self.map_clicked_dlg.tableClickedWays
-        self.layer_current_selected_fs = []
-        self.layer_current_selected_fs = CommonTools.populateTableByClickedFeatures(
-                                                self.layer_current, table)
+        self.current_layer_selected_fs = []
+        self.current_layer_selected_fs = CommonTools.populateTableByClickedFeatures(
+                                                self.current_layer, table)
 
-        self.layer_current.removeSelection()
+        self.current_layer.removeSelection()
+
+        # percentBox = self.addFiltersDlg()
+        self.addFiltersDlg()
+
         self.map_clicked_dlg.show()
         result = self.map_clicked_dlg.exec_()
         if result:
-            
+            # print(percentBox.value())
             self.dockWidget.show()
         else:
             self.clearMapselectedHighlight()
 
 
-    # def showClickedFeaturesList(self):
-    #     if self.map_clicked_dlg is None:
-    #         self.map_clicked_dlg = WaysCalcClickResDialog()
-
-    #     header_labels_list = []
-    #     header_labels_list.append('feature_id')
-    #     field_aliases_dict = self.layer_current.attributeAliases()
-    #     for k in field_aliases_dict.keys():
-    #         field = field_aliases_dict[k] if field_aliases_dict[k] else k
-    #         header_labels_list.append(field)
-
-    #     self.layer_current_selected_fs = []
-    #     for feature in self.layer_current.selectedFeatures():
-    #         feature_attributes_dict = {}
-    #         feature_attributes_dict["feature_id"]=feature.id()
-    #         for field_name in field_aliases_dict.keys():
-    #             feature_attributes_dict[field_name] = feature[field_name]
-    #         self.layer_current_selected_fs.append(feature_attributes_dict)
-
-    #     features_cnt = self.layer_current.selectedFeatureCount()
-    #     columns_cnt = len(header_labels_list)
-    #     self.map_clicked_dlg.tableClickedWays.setRowCount(features_cnt)
-    #     self.map_clicked_dlg.tableClickedWays.setColumnCount(columns_cnt)
-
-    #     for rownum in range(features_cnt):
-    #         for f_idx, fieldname in enumerate(self.layer_current_selected_fs[0].keys()):
-    #             attr_value = self.layer_current_selected_fs[rownum][fieldname]
-    #             # item = self.createTableItem(rownum, fieldname, self.layer_current, attr_value)
-    #             item = CommonTools.createTableItem(fieldname, self.layer_current, attr_value)
-    #             self.map_clicked_dlg.tableClickedWays.setItem(rownum, f_idx, item)
+    def addFiltersDlg(self):
+        inters_layer_name = self.inters_layer.name()
+        if self.settings["modules"].get("intersection_ways") is not None:
+            self.settings_layer = self.settings["modules"]["intersection_ways"]["layers"].get(inters_layer_name)
+            if self.settings_layer is not None:
+                ava_filters_fields = self.settings_layer.get("filters_fields")
+                if ava_filters_fields is not None:
+                    for field in ava_filters_fields:
+                        self.addFilter(field)
 
 
-    #     self.map_clicked_dlg.tableClickedWays.setHorizontalHeaderLabels(header_labels_list)
-    #     self.map_clicked_dlg.tableClickedWays.resizeColumnsToContents()
-    #     self.map_clicked_dlg.tableClickedWays.setColumnHidden(0, True)
+    def addFilter(self, field):
+        filter_label = QtWidgets.QLabel()
+        filter_label.setObjectName(f"label_{field}")
+        filter_label.setText(self.settings_layer["filters_fields"][field]["label"])
+        
+        filter_widget = self.createWidget(field)
+        
+        self.map_clicked_dlg.groupBox_filter.layout().addRow(filter_label, filter_widget)
+        # print(getattr(QtWidgets, 'QSpinBox')())
 
-    #     self.map_clicked_dlg.show()
+
+    def createWidget(self, field):
+        settings_field = self.settings_layer["filters_fields"][field]
+        widget_type = settings_field["widget_type"]
+        filter_widget = getattr(QtWidgets, widget_type)()
+        filter_widget.setObjectName(field)
+
+        widget_options = settings_field["widget_options"]
+        for wo in widget_options:
+            setattr(filter_widget, wo, widget_options[wo])
+
+        if settings_field["source_type"] == "own":
+            idx_field = self.inters_layer.fields().indexFromName(field)
+            if not idx_field > 0:
+                print(f"Field {field} does not found in layer")
+            field_type = self.inters_layer.editorWidgetSetup(idx_field).type()
+            if field_type == 'ValueMap':
+                valuemap = self.inters_layer.editorWidgetSetup(idx_field).config()['map']
+                for key, value in valuemap.items():
+                        if widget_type == "QListWidget":
+                            item = QListWidgetItem(value)
+                            item.setData(Qt.UserRole, QVariant(key))
+                            filter_widget.addItem(item)
+                        elif widget_type == "QComboBox":
+                            filter_widget.addItem(value, QVariant(key))
+
+        return filter_widget
+
+
+    # Добавление фильтров в окно результата после клика на карте
+    def addFiltersDlg1(self):
+        gb_filter_layout = self.map_clicked_dlg.groupBox_filter.layout()
+
+        percentLayout = QtWidgets.QHBoxLayout()
+        percentLayout.setObjectName("percentLayout")
+        percentLabel = QtWidgets.QLabel()
+        percentLabel.setObjectName("percentLabel") 
+        percentLabel.setText("Минимальный процент пересечения")
+        percentLayout.addWidget(percentLabel)
+        percentSpinBox = QtWidgets.QSpinBox()
+        percentSpinBox.setObjectName("percentSpinBox") 
+        percentSpinBox.setMaximum(100)
+        percentSpinBox.setMinimum(0)
+        percentSpinBox.setSingleStep(5)
+        percentSpinBox.setSuffix('%')
+        percentLayout.addWidget(percentSpinBox)
+
+        companiesLayout = QtWidgets.QHBoxLayout()
+        companiesLayout.setObjectName("companiesLayout")
+        companiesLabel = QtWidgets.QLabel()
+        companiesLabel.setObjectName("companiesLabel") 
+        companiesLabel.setText("Компании")
+        companiesLayout.addWidget(percentLabel)
+        companiesList = QtWidgets.QListWidget()
+        companiesList.setObjectName("companiesList")
+
+        gb_filter_layout.addLayout(percentLayout)
+
+        return percentSpinBox
