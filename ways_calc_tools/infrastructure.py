@@ -84,6 +84,7 @@ class CommonTools:
             elif layout.itemAt(i).widget():
                 layout.itemAt(i).widget().setParent(None)  
 
+
     @staticmethod
     def addFilter(field, layer, layout, settings_layer):
         filter_label = QtWidgets.QLabel()
@@ -94,6 +95,7 @@ class CommonTools:
         
         layout.addRow(filter_label, filter_widget)
         # print(getattr(QtWidgets, 'QSpinBox')())
+
 
     @staticmethod
     def __createWidget(field, layer, settings_layer):
@@ -122,11 +124,33 @@ class CommonTools:
             if field_type == 'ValueMap':
                 valuemap = layer.editorWidgetSetup(idx_field).config()['map']
                 for key, value in valuemap.items():
-                        if widget_type == "QListWidget":
-                            item = QListWidgetItem(value)
-                            item.setData(Qt.UserRole, QVariant(key))
-                            filter_widget.addItem(item)
-                        elif widget_type == "QComboBox":
-                            filter_widget.addItem(value, QVariant(key))
+                    if widget_type == "QListWidget":
+                        item = QListWidgetItem(key)
+                        item.setData(Qt.UserRole, QVariant(value))
+                        filter_widget.addItem(item)
+                    elif widget_type == "QComboBox":
+                        filter_widget.addItem(key, QVariant(value))
 
         return filter_widget
+
+
+    @staticmethod
+    def findWidgetByName(layout, widget_name):
+        for i in reversed(range(layout.count())): 
+            if layout.itemAt(i).widget():
+                widget = layout.itemAt(i).widget()
+                if widget.objectName() == widget_name:
+                    return widget
+    
+    @staticmethod
+    def getFilterValues(fieldname, layout):
+        value = None
+        widget= CommonTools.findWidgetByName(layout, fieldname)
+        if widget:
+            if widget.metaObject().className() == "QSpinBox":
+                value = widget.value()
+            elif widget.metaObject().className() == "QListWidget":
+                value = [item.data(Qt.UserRole) for item in widget.selectedItems()]
+            elif widget.metaObject().className() == "QComboBox":
+                value = widget.currentData(Qt.UserRole)
+        return value

@@ -4,7 +4,7 @@
             "layers": {
                 "Маршрутная сеть": {
                     "filters_fields": {
-                        "percent": {
+                        "_percent": {
                             "label": "Минимальный процент пересечения",
                             "source_type": "custom",
                             "widget_type": "QSpinBox",
@@ -21,9 +21,16 @@
                             "widget_options":{
                                 "setSelectionMode": "3"
                             }
+                        },
+                        "t_type": {
+                            "label": "Тип транспорта",
+                            "source_type": "own",
+                            "widget_type": "QComboBox",
+                            "widget_options":{
+                            }
                         }
-
-                    }
+                    },
+                    "buffer_size": "2.5"
                 }
             }
         }

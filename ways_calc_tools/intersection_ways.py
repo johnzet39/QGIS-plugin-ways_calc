@@ -24,7 +24,7 @@
 from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication, Qt, QObject, QVariant
 from qgis.PyQt.QtGui import QIcon, QColor
 from qgis.PyQt import QtWidgets
-from qgis.PyQt.QtWidgets import QAction, QTableWidgetItem, QListWidget, QListWidgetItem
+from qgis.PyQt.QtWidgets import QAction, QTableWidgetItem, QListWidget, QListWidgetItem, QDialogButtonBox
 from qgis.core import (
     QgsProject,
     QgsVectorLayer,
@@ -55,6 +55,7 @@ class IntersectionWays:
 
         self.map_clicked_dlg = WaysCalcClickResDialog()
         self.sel_layer_dlg = WaysCalcSelectLayerDialog()
+        self.buttonOk = self.map_clicked_dlg.button_box.button( QDialogButtonBox.Ok )
 
         self.inters_layer = None # слой сравнения
         self.current_layer = None # текущий выбранный слой
@@ -69,14 +70,14 @@ class IntersectionWays:
 
     def onLoadModule(self):
         print('loadModule')
-        self.map_clicked_dlg.tableClickedWays.itemSelectionChanged.connect(self.onMapClickedTableSeChanged)
+        self.map_clicked_dlg.tableClickedWays.itemSelectionChanged.connect(self.onMapClickedTableSelChanged)
         self.dockWidget.visibilityChanged.connect(self.onDockVisibilityChanged)
         self.initSettings()
 
 
     def onUnLoadModule(self):
         print('unloadModule')
-        self.map_clicked_dlg.tableClickedWays.itemSelectionChanged.disconnect(self.onMapClickedTableSeChanged)
+        self.map_clicked_dlg.tableClickedWays.itemSelectionChanged.disconnect(self.onMapClickedTableSelChanged)
         self.dockWidget.visibilityChanged.disconnect(self.onDockVisibilityChanged)
         
         self.clearMapselectedHighlight()
@@ -91,7 +92,7 @@ class IntersectionWays:
             self.clearMapselectedHighlight()
             self.current_layer.removeSelection()
 
-    def onMapClickedTableSeChanged(self):
+    def onMapClickedTableSelChanged(self):
         cur_row_index = self.map_clicked_dlg.tableClickedWays.currentRow()
         if cur_row_index > -1:
             self.clearMapselectedHighlight()
@@ -105,6 +106,15 @@ class IntersectionWays:
             h.setWidth(6)
             h.setFillColor(QColor(0,150,200,150))
             self.mapclicked_h_list.append(h)
+
+        self.setButtonOkStatus()
+
+
+    def setButtonOkStatus(self):
+        if self.map_clicked_dlg.tableClickedWays.currentRow() > -1:
+            self.buttonOk.setEnabled(True)
+        else:
+            self.buttonOk.setEnabled(False)
 
 
     def clearMapselectedHighlight(self):
@@ -126,6 +136,7 @@ class IntersectionWays:
         result = self.sel_layer_dlg.exec_()
         if result:
             self.inters_layer = self.sel_layer_dlg.mMapLayerComboBox.currentLayer()
+            self.settings_layer = self.settings["modules"]["intersection_ways"]["layers"].get(self.inters_layer.name())
             self.clearFiltersDlg() # очистить форму от фильтров
             self.addFiltersDlg() # добавить фильтры на форму
 
@@ -164,15 +175,18 @@ class IntersectionWays:
 
     def showClickedFeaturesList(self):
         table = self.map_clicked_dlg.tableClickedWays
+        table.reset()
         self.current_layer_selected_fs = []
         self.current_layer_selected_fs = CommonTools.populateTableByClickedFeatures(
                                                 self.current_layer, table)
 
         self.current_layer.removeSelection()
 
+        self.setButtonOkStatus()
         self.map_clicked_dlg.show()
         result = self.map_clicked_dlg.exec_()
         if result:
+            self.calcIntersects()
             self.dockWidget.show()
         else:
             self.clearMapselectedHighlight()
@@ -183,9 +197,7 @@ class IntersectionWays:
 
 
     def addFiltersDlg(self):
-        inters_layer_name = self.inters_layer.name()
         if self.settings["modules"].get("intersection_ways") is not None:
-            self.settings_layer = self.settings["modules"]["intersection_ways"]["layers"].get(inters_layer_name)
             if self.settings_layer is not None:
                 ava_filters_fields = self.settings_layer.get("filters_fields")
                 if ava_filters_fields is not None:
@@ -195,4 +207,35 @@ class IntersectionWays:
                             self.inters_layer,
                             self.map_clicked_dlg.groupBox_filter.layout(),
                             self.settings_layer)
+
+                    
+    def calcIntersects(self):
+        current_feature_idx = self.map_clicked_dlg.tableClickedWays.currentRow()
+        current_feature_id = int(self.map_clicked_dlg.tableClickedWays.item(current_feature_idx, 0).text())
+        current_feature = self.current_layer.getFeature(current_feature_id)   
+
+        # field_percent_json = self.settings_layer["filters_fields"].get("_percent")
+        # if field_percent_json is not None:
+        filters_dict = {}
+        for fieldname in self.settings_layer["filters_fields"]:
+            filters_dict[fieldname] = CommonTools.getFilterValues(fieldname, self.map_clicked_dlg.groupBox_filter.layout())
+            print(filters_dict)
+
+        if self.settings_layer is not None:
+            buffer_size = float(self.settings_layer.get("buffer_size", ".0"))
+        else:
+            buffer_size = .0
+
+        cf_buffer = current_feature.geometry().buffer(buffer_size, 5)
+
+        for intfeat in self.inters_layer.getFeatures():
+            if intfeat.id() == current_feature_id and self.current_layer == self.inters_layer: #отсекаем сравниваемую линию
+                continue
+            if intfeat.geometry().intersects(cf_buffer):
+                intfeat_buffer = intfeat.geometry().buffer(buffer_size, 5) # буфер пересекающихся линий, для отображения пересечений
+                intersection_buffers = QgsGeometry(cf_buffer).intersection(intfeat_buffer) # для отображения пересечений
+                intersection_line = QgsGeometry(current_feature.geometry()).intersection(intfeat_buffer) # части текущей линии, которые попали в буфер сравниваемого объекта
+
+                intfeat_length = intfeat.geometry().length()
+                intersection_line_length = intersection_line.length()
 
