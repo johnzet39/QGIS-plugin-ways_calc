@@ -21,12 +21,10 @@
  ***************************************************************************/
 """
 
-from PyQt5.QtCore import QVariant
-from PyQt5.QtWidgets import QListWidget, QListWidgetItem
-from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication, Qt, QObject
+from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication, Qt, QObject, QVariant
 from qgis.PyQt.QtGui import QIcon, QColor
 from qgis.PyQt import QtWidgets
-from qgis.PyQt.QtWidgets import QAction, QTableWidgetItem
+from qgis.PyQt.QtWidgets import QAction, QTableWidgetItem, QListWidget, QListWidgetItem
 from qgis.core import (
     QgsProject,
     QgsVectorLayer,
@@ -128,6 +126,7 @@ class IntersectionWays:
         result = self.sel_layer_dlg.exec_()
         if result:
             self.inters_layer = self.sel_layer_dlg.mMapLayerComboBox.currentLayer()
+            self.addFiltersDlg() # добавить фильтры на форму
 
 
     def checkLayers(self):
@@ -170,9 +169,6 @@ class IntersectionWays:
 
         self.current_layer.removeSelection()
 
-        # percentBox = self.addFiltersDlg()
-        self.addFiltersDlg()
-
         self.map_clicked_dlg.show()
         result = self.map_clicked_dlg.exec_()
         if result:
@@ -190,75 +186,8 @@ class IntersectionWays:
                 ava_filters_fields = self.settings_layer.get("filters_fields")
                 if ava_filters_fields is not None:
                     for field in ava_filters_fields:
-                        self.addFilter(field)
-
-
-    def addFilter(self, field):
-        filter_label = QtWidgets.QLabel()
-        filter_label.setObjectName(f"label_{field}")
-        filter_label.setText(self.settings_layer["filters_fields"][field]["label"])
-        
-        filter_widget = self.createWidget(field)
-        
-        self.map_clicked_dlg.groupBox_filter.layout().addRow(filter_label, filter_widget)
-        # print(getattr(QtWidgets, 'QSpinBox')())
-
-
-    def createWidget(self, field):
-        settings_field = self.settings_layer["filters_fields"][field]
-        widget_type = settings_field["widget_type"]
-        filter_widget = getattr(QtWidgets, widget_type)()
-        filter_widget.setObjectName(field)
-
-        widget_options = settings_field["widget_options"]
-        for wo in widget_options:
-            setattr(filter_widget, wo, widget_options[wo])
-
-        if settings_field["source_type"] == "own":
-            idx_field = self.inters_layer.fields().indexFromName(field)
-            if not idx_field > 0:
-                print(f"Field {field} does not found in layer")
-            field_type = self.inters_layer.editorWidgetSetup(idx_field).type()
-            if field_type == 'ValueMap':
-                valuemap = self.inters_layer.editorWidgetSetup(idx_field).config()['map']
-                for key, value in valuemap.items():
-                        if widget_type == "QListWidget":
-                            item = QListWidgetItem(value)
-                            item.setData(Qt.UserRole, QVariant(key))
-                            filter_widget.addItem(item)
-                        elif widget_type == "QComboBox":
-                            filter_widget.addItem(value, QVariant(key))
-
-        return filter_widget
-
-
-    # Добавление фильтров в окно результата после клика на карте
-    def addFiltersDlg1(self):
-        gb_filter_layout = self.map_clicked_dlg.groupBox_filter.layout()
-
-        percentLayout = QtWidgets.QHBoxLayout()
-        percentLayout.setObjectName("percentLayout")
-        percentLabel = QtWidgets.QLabel()
-        percentLabel.setObjectName("percentLabel") 
-        percentLabel.setText("Минимальный процент пересечения")
-        percentLayout.addWidget(percentLabel)
-        percentSpinBox = QtWidgets.QSpinBox()
-        percentSpinBox.setObjectName("percentSpinBox") 
-        percentSpinBox.setMaximum(100)
-        percentSpinBox.setMinimum(0)
-        percentSpinBox.setSingleStep(5)
-        percentSpinBox.setSuffix('%')
-        percentLayout.addWidget(percentSpinBox)
-
-        companiesLayout = QtWidgets.QHBoxLayout()
-        companiesLayout.setObjectName("companiesLayout")
-        companiesLabel = QtWidgets.QLabel()
-        companiesLabel.setObjectName("companiesLabel") 
-        companiesLabel.setText("Компании")
-        companiesLayout.addWidget(percentLabel)
-        companiesList = QtWidgets.QListWidget()
-        companiesList.setObjectName("companiesList")
-
-        gb_filter_layout.addLayout(percentLayout)
-
-        return percentSpinBox
+                        CommonTools.addFilter(
+                            field,
+                            self.inters_layer,
+                            self.map_clicked_dlg.groupBox_filter.layout(),
+                            self.settings_layer)

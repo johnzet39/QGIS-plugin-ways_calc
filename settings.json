@@ -12,14 +12,14 @@
                                 "setMaximum": "100",
                                 "setMinimum": "0",
                                 "setSingleStep": "5",
-                                "setSuffix": "%)"                            }
+                                "setSuffix": "%"                            }
                         },
                         "company": {
                             "label": "Компания",
                             "source_type": "own",
-                            "widget_type": "QListBox",
+                            "widget_type": "QListWidget",
                             "widget_options":{
-                                
+                                "setSelectionMode": "3"
                             }
                         }
 

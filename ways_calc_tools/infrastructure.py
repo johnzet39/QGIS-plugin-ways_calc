@@ -1,5 +1,6 @@
-from qgis.PyQt.QtWidgets import QTableWidgetItem
-from qgis.PyQt.QtCore import Qt
+from qgis.PyQt import QtWidgets
+from qgis.PyQt.QtWidgets import QTableWidgetItem, QListWidgetItem
+from qgis.PyQt.QtCore import Qt, QVariant
 
 class CommonTools:
     
@@ -72,3 +73,51 @@ class CommonTools:
         table.setColumnHidden(0, True)
         table.setColumnHidden(1, True)
         return layer_current_selected_fs
+
+
+    @staticmethod
+    def addFilter(field, layer, layout, settings_layer):
+        filter_label = QtWidgets.QLabel()
+        filter_label.setObjectName(f"label_{field}")
+        filter_label.setText(settings_layer["filters_fields"][field]["label"])
+        
+        filter_widget = CommonTools.__createWidget(field, layer, settings_layer)
+        
+        layout.addRow(filter_label, filter_widget)
+        # print(getattr(QtWidgets, 'QSpinBox')())
+
+    @staticmethod
+    def __createWidget(field, layer, settings_layer):
+        settings_field = settings_layer["filters_fields"][field]
+        widget_type = settings_field["widget_type"]
+        filter_widget = getattr(QtWidgets, widget_type)()
+        filter_widget.setObjectName(field)
+
+        widget_options = settings_field["widget_options"]
+        for wo in widget_options:
+            value = widget_options[wo]
+            try:
+                value = int(value)
+            except:
+                try:
+                    value = float(value)
+                except:
+                    pass
+            getattr(filter_widget, wo)(value)
+
+        if settings_field["source_type"] == "own":
+            idx_field = layer.fields().indexFromName(field)
+            if not idx_field > 0:
+                print(f"Field {field} does not found in layer")
+            field_type = layer.editorWidgetSetup(idx_field).type()
+            if field_type == 'ValueMap':
+                valuemap = layer.editorWidgetSetup(idx_field).config()['map']
+                for key, value in valuemap.items():
+                        if widget_type == "QListWidget":
+                            item = QListWidgetItem(value)
+                            item.setData(Qt.UserRole, QVariant(key))
+                            filter_widget.addItem(item)
+                        elif widget_type == "QComboBox":
+                            filter_widget.addItem(value, QVariant(key))
+
+        return filter_widget
