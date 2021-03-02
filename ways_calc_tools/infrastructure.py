@@ -38,10 +38,16 @@ class CommonTools:
 
 
     @staticmethod
-    def populateTableByClickedFeatures(layer, table):
+    def populateTableByFeatures(layer, table, addattributes=None):
+        print(addattributes)
         header_labels_list = []
         header_labels_list.append('feature_id')
         header_labels_list.append('geometry')
+
+        if addattributes is not None:
+            for att in next(iter(addattributes.values())):
+                header_labels_list.append(att)
+
         field_aliases_dict = layer.attributeAliases()
         for k in field_aliases_dict.keys():
             field = field_aliases_dict[k] if field_aliases_dict[k] else k
@@ -52,6 +58,11 @@ class CommonTools:
             feature_attributes_dict = {}
             feature_attributes_dict["feature_id"]=feature.id()
             feature_attributes_dict["geometry"]=feature.geometry().asWkt()
+
+            if addattributes is not None:
+                for atkey, atvalue in addattributes[feature.id()].items():
+                    feature_attributes_dict[atkey] = atvalue
+
             for field_name in field_aliases_dict.keys():
                 feature_attributes_dict[field_name] = feature[field_name]
             layer_current_selected_fs.append(feature_attributes_dict)
@@ -130,6 +141,7 @@ class CommonTools:
                         filter_widget.addItem(item)
                     elif widget_type == "QComboBox":
                         filter_widget.addItem(key, QVariant(value))
+                        filter_widget.setCurrentIndex(-1)
 
         return filter_widget
 

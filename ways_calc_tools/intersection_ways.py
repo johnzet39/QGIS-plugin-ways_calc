@@ -177,7 +177,7 @@ class IntersectionWays:
         table = self.map_clicked_dlg.tableClickedWays
         table.reset()
         self.current_layer_selected_fs = []
-        self.current_layer_selected_fs = CommonTools.populateTableByClickedFeatures(
+        self.current_layer_selected_fs = CommonTools.populateTableByFeatures(
                                                 self.current_layer, table)
 
         self.current_layer.removeSelection()
@@ -214,12 +214,11 @@ class IntersectionWays:
         current_feature_id = int(self.map_clicked_dlg.tableClickedWays.item(current_feature_idx, 0).text())
         current_feature = self.current_layer.getFeature(current_feature_id)   
 
-        # field_percent_json = self.settings_layer["filters_fields"].get("_percent")
-        # if field_percent_json is not None:
         filters_dict = {}
         for fieldname in self.settings_layer["filters_fields"]:
             filters_dict[fieldname] = CommonTools.getFilterValues(fieldname, self.map_clicked_dlg.groupBox_filter.layout())
-            print(filters_dict)
+            
+        percent_inters = int(filters_dict.get("_percent", "0"))
 
         if self.settings_layer is not None:
             buffer_size = float(self.settings_layer.get("buffer_size", ".0"))
@@ -227,6 +226,10 @@ class IntersectionWays:
             buffer_size = .0
 
         cf_buffer = current_feature.geometry().buffer(buffer_size, 5)
+
+        il_selection_list = []
+
+        addition_attributes = {}
 
         for intfeat in self.inters_layer.getFeatures():
             if intfeat.id() == current_feature_id and self.current_layer == self.inters_layer: #отсекаем сравниваемую линию
@@ -239,3 +242,18 @@ class IntersectionWays:
                 intfeat_length = intfeat.geometry().length()
                 intersection_line_length = intersection_line.length()
 
+                result_percent_inters = (intersection_line_length/intfeat_length)*100
+                if result_percent_inters >= percent_inters:
+                    il_selection_list.append(intfeat.id())
+
+                    feat_attrs = {
+                        "Длина объекта": intfeat_length,
+                        "Длина пересечения": intersection_line_length,
+                        "Процент пересечения": result_percent_inters
+                    }
+                    addition_attributes[intfeat.id()] = feat_attrs
+
+        self.inters_layer.select(il_selection_list)
+
+        CommonTools.populateTableByFeatures(self.inters_layer, self.dockWidget.tableResult, addition_attributes)
+        
