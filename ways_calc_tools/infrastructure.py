@@ -76,6 +76,15 @@ class CommonTools:
 
 
     @staticmethod
+    def clearFiltersLayout(layout):
+        for i in reversed(range(layout.count())):
+            if layout.itemAt(i).layout():
+                CommonTools.clearFieldsLayout(layout.itemAt(i).layout())
+                layout.itemAt(i).layout().setParent(None)
+            elif layout.itemAt(i).widget():
+                layout.itemAt(i).widget().setParent(None)  
+
+    @staticmethod
     def addFilter(field, layer, layout, settings_layer):
         filter_label = QtWidgets.QLabel()
         filter_label.setObjectName(f"label_{field}")

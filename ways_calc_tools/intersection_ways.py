@@ -126,6 +126,7 @@ class IntersectionWays:
         result = self.sel_layer_dlg.exec_()
         if result:
             self.inters_layer = self.sel_layer_dlg.mMapLayerComboBox.currentLayer()
+            self.clearFiltersDlg() # очистить форму от фильтров
             self.addFiltersDlg() # добавить фильтры на форму
 
 
@@ -172,10 +173,13 @@ class IntersectionWays:
         self.map_clicked_dlg.show()
         result = self.map_clicked_dlg.exec_()
         if result:
-            # print(percentBox.value())
             self.dockWidget.show()
         else:
             self.clearMapselectedHighlight()
+
+
+    def clearFiltersDlg(self):
+        CommonTools.clearFiltersLayout(self.map_clicked_dlg.groupBox_filter.layout())
 
 
     def addFiltersDlg(self):
@@ -191,3 +195,4 @@ class IntersectionWays:
                             self.inters_layer,
                             self.map_clicked_dlg.groupBox_filter.layout(),
                             self.settings_layer)
+
