@@ -30,7 +30,9 @@ from qgis.core import (
     QgsVectorLayer,
     QgsWkbTypes, QgsRectangle,
     QgsMapLayerProxyModel,
-    QgsGeometry
+    QgsGeometry,
+    QgsFeatureRequest,
+    QgsExpression
 )
 from qgis.gui import (
         QgsMapToolEmitPoint,
@@ -260,7 +262,7 @@ class IntersectionWays:
         if self.settings_layer is not None:
             for fieldname in self.settings_layer.get("filters_fields"):
                 filters_dict[fieldname] = CommonTools.getFilterValues(fieldname, self.map_clicked_dlg.groupBox_filter.layout())
-            
+
         percent_inters = int(filters_dict.get("_percent", "0"))
         buffer_size = float(filters_dict.get("_buffer_size", "0.01"))
 
@@ -272,7 +274,16 @@ class IntersectionWays:
         # дополнительные пересекаемые слои (для вычисления количества общих пересечений)
         additional_layers = self.getAdditionalLayerData()
 
-        for intfeat in self.inters_layer.getFeatures():
+        filter_expression = self.generateFilterExpression(filters_dict)
+        print(filter_expression)
+        if filter_expression:
+            expr = QgsExpression(filter_expression)
+            request = QgsFeatureRequest(expr)
+            inters_layer_features = self.inters_layer.getFeatures(request)
+        else:
+            inters_layer_features = self.inters_layer.getFeatures()
+
+        for intfeat in inters_layer_features:
             if intfeat.id() == current_feature_id and self.current_layer == self.inters_layer: #отсекаем сравниваемую линию
                 continue
             if intfeat.geometry().intersects(cf_buffer):
@@ -310,7 +321,30 @@ class IntersectionWays:
 
         self.setFilterLayer(self.inters_layer, list(il_objects_result_dict.keys()))
         self.populateTableResult(self.dockWidget.tableResult, il_objects_result_dict)
+            
+
+    def generateFilterExpression(self, filters_dict):
+        expressions_list = []
+
+        for key, value in filters_dict.items():
+            if key.startswith('_'):
+                continue
+            if isinstance(value, list):
+                if len(value) > 0:
+                    unionvalue = ', '.join("'" + item + "'" for item in value)
+                    expressions_list.append(f"{key} in ({unionvalue})")
+            if isinstance(value, str):
+                expressions_list.append(f"{key} like {value}")
+            if isinstance(value, int):
+                expressions_list.append(f"{key} = {int(value)}")
+            if isinstance(value, float):
+                expressions_list.append(f"{key} = {float(value)}")
         
+        if len(expressions_list) > 0:
+            expression = " and ".join(expressions_list)
+            return expression
+        return None
+
 
     def getDictFeaturesAttributes(self, intfeat, fields_aliases_dict):
         feature_attributes = {}
@@ -333,6 +367,10 @@ class IntersectionWays:
 
     def populateTableResult(self, table, objects_dict):
         table.reset()
+        if not objects_dict:
+            print("not found")
+            return
+
         first_feature_data = list(objects_dict.items())[0][1]
 
         headers_labels_list = list(first_feature_data.keys())
@@ -407,10 +445,10 @@ class IntersectionWays:
                         buffer_size = 0
                     print('1', buffer_size)
                     if intersection_geometry.intersects(feat.geometry().buffer(buffer_size, 5)):
-                        cnt_intersects+=1
+                        cnt_intersects += 1
                 else:
                     if intersection_geometry.intersects(feat.geometry()):
-                        cnt_intersects+=1
+                        cnt_intersects += 1
 
             attributes_dict[layer.name()] = cnt_intersects
 

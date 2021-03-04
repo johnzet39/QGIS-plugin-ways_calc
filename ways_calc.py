@@ -113,7 +113,7 @@ class WaysCalc:
         self.toolButton_action = self.iface.addToolBarWidget(self.toolButton)
 
         self.action_intersection = QAction(
-                QIcon(":/plugins/ways_calc/icon.png"),
+                QIcon(":/plugins/_Ways_calc/icon.png"),
                 u'Поиск совпадающих маршрутов',
                 self.iface.mainWindow())
         self.action_initLayerWays = QAction(
