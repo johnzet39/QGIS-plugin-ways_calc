@@ -7,13 +7,20 @@ class CommonTools:
     @staticmethod
     def createTableItem(column_name, layer, value):
         idx_field = layer.fields().indexFromName(column_name)
-        field_type = layer.editorWidgetSetup(idx_field).type()
+        if idx_field > -1:
+            value = CommonTools.representFieldValueByType(idx_field, layer, value)
+        item = QTableWidgetItem()
+        item.setData(Qt.EditRole, value)
+        return item
 
-        # value = self.layer_current_selected_fs[rownum][column_name]
+
+    @staticmethod
+    def representFieldValueByType(column_idx, layer, value):
+        field_type = layer.editorWidgetSetup(column_idx).type()
 
         # подставляем значения в соответствии с заданными справочниками в виджетах
         if field_type == 'ValueMap':
-            valuemap = layer.editorWidgetSetup(idx_field).config()['map']
+            valuemap = layer.editorWidgetSetup(column_idx).config()['map']
             # почему-то некоторые "Карты значений" представлены в виде словарей,
             # а некоторые в виде списков словарей. Объединяем последние в словари
             if isinstance(valuemap, list): 
@@ -31,22 +38,18 @@ class CommonTools:
                 value = int(value)
             # значение из словаря
             value = list(valuemap.keys())[list(valuemap.values()).index(str(value))]
-
-        item = QTableWidgetItem()
-        item.setData(Qt.EditRole, value)
-        return item
+        return value
 
 
     @staticmethod
-    def populateTableByFeatures(layer, table, addattributes=None):
-        print(addattributes)
+    def populateTableByClickedFeatures(layer, table):
         header_labels_list = []
         header_labels_list.append('feature_id')
         header_labels_list.append('geometry')
 
-        if addattributes is not None:
-            for att in next(iter(addattributes.values())):
-                header_labels_list.append(att)
+        # if addattributes is not None:
+        #     for att in next(iter(addattributes.values())):
+        #         header_labels_list.append(att)
 
         field_aliases_dict = layer.attributeAliases()
         for k in field_aliases_dict.keys():
@@ -56,12 +59,12 @@ class CommonTools:
         layer_current_selected_fs = []
         for feature in layer.selectedFeatures():
             feature_attributes_dict = {}
-            feature_attributes_dict["feature_id"]=feature.id()
-            feature_attributes_dict["geometry"]=feature.geometry().asWkt()
+            feature_attributes_dict["feature_id"] = feature.id()
+            feature_attributes_dict["geometry"] = feature.geometry().asWkt()
 
-            if addattributes is not None:
-                for atkey, atvalue in addattributes[feature.id()].items():
-                    feature_attributes_dict[atkey] = atvalue
+            # if addattributes is not None:
+            #     for atkey, atvalue in addattributes[feature.id()].items():
+            #         feature_attributes_dict[atkey] = atvalue
 
             for field_name in field_aliases_dict.keys():
                 feature_attributes_dict[field_name] = feature[field_name]
@@ -81,9 +84,14 @@ class CommonTools:
 
         table.setHorizontalHeaderLabels(header_labels_list)
         table.resizeColumnsToContents()
-        table.setColumnHidden(0, True)
+        if len(header_labels_list) > 2:
+            table.setColumnHidden(0, True)
         table.setColumnHidden(1, True)
         return layer_current_selected_fs
+
+
+    def populateTableByFeatures(layer, table):
+        pass
 
 
     @staticmethod
@@ -134,6 +142,16 @@ class CommonTools:
             field_type = layer.editorWidgetSetup(idx_field).type()
             if field_type == 'ValueMap':
                 valuemap = layer.editorWidgetSetup(idx_field).config()['map']
+
+                # по какой-то неведомой причине какие-то 
+                # карты значений в виде списка, 
+                # какие-то в виде словарей
+                if isinstance(valuemap, list): 
+                    newvaluemap = {}
+                    for d in valuemap:
+                        newvaluemap[list(d.keys())[0]] = d[list(d.keys())[0]]
+                    valuemap = newvaluemap
+
                 for key, value in valuemap.items():
                     if widget_type == "QListWidget":
                         item = QListWidgetItem(key)
@@ -160,6 +178,8 @@ class CommonTools:
         widget= CommonTools.findWidgetByName(layout, fieldname)
         if widget:
             if widget.metaObject().className() == "QSpinBox":
+                value = widget.value()
+            if widget.metaObject().className() == "QDoubleSpinBox":
                 value = widget.value()
             elif widget.metaObject().className() == "QListWidget":
                 value = [item.data(Qt.UserRole) for item in widget.selectedItems()]

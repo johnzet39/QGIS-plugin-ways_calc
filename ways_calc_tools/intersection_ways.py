@@ -64,13 +64,18 @@ class IntersectionWays:
         self.settings = None
         self.settings_layer = None
 
+        #highlights
         self.mapclicked_h_list = []
+        self.intersected_h_list = []
+        self.intersection_h_list = []
+
         self.onLoadModule()
 
 
     def onLoadModule(self):
         print('loadModule')
         self.map_clicked_dlg.tableClickedWays.itemSelectionChanged.connect(self.onMapClickedTableSelChanged)
+        self.dockWidget.tableResult.itemSelectionChanged.connect(self.onResultTableSelChanged)
         self.dockWidget.visibilityChanged.connect(self.onDockVisibilityChanged)
         self.initSettings()
 
@@ -78,9 +83,11 @@ class IntersectionWays:
     def onUnLoadModule(self):
         print('unloadModule')
         self.map_clicked_dlg.tableClickedWays.itemSelectionChanged.disconnect(self.onMapClickedTableSelChanged)
+        self.dockWidget.tableResult.itemSelectionChanged.disconnect(self.onResultTableSelChanged)        
         self.dockWidget.visibilityChanged.disconnect(self.onDockVisibilityChanged)
         
-        self.clearMapselectedHighlight()
+        self.clearAllHighlights()
+
 
     def initSettings(self):
         with open(os.path.join(self.plugin_dir, "..\settings.json"), "r") as read_file:
@@ -89,13 +96,40 @@ class IntersectionWays:
 
     def onDockVisibilityChanged(self):
         if self.dockWidget.isHidden():
-            self.clearMapselectedHighlight()
+            self.clearAllHighlights()
+            self.setFilterLayer(self.inters_layer)
             self.current_layer.removeSelection()
+
+
+    def onResultTableSelChanged(self):
+        cur_row_index = self.dockWidget.tableResult.currentRow()
+        if cur_row_index > -1:
+            self.clearHighlight(self.intersected_h_list)
+            self.clearHighlight(self.intersection_h_list)
+
+            f_geometry = QgsGeometry()
+            f_geometry = QgsGeometry.fromWkt(
+                    self.dockWidget.tableResult.item(cur_row_index, 1).text())
+            h = QgsHighlight(self.iface.mapCanvas(), f_geometry, self.inters_layer)
+            h.setColor(QColor(0,230,50,220))
+            h.setWidth(6)
+            h.setFillColor(QColor(0,230,0,150))
+            self.intersected_h_list.append(h)
+
+            if_geometry = QgsGeometry()
+            if_geometry = QgsGeometry.fromWkt(
+                    self.dockWidget.tableResult.item(cur_row_index, 2).text())
+            ih = QgsHighlight(self.iface.mapCanvas(), if_geometry, self.inters_layer)
+            ih.setColor(QColor(230,0,0,220))
+            ih.setWidth(6)
+            ih.setFillColor(QColor(230,0,0,150))
+            self.intersection_h_list.append(ih)
+
 
     def onMapClickedTableSelChanged(self):
         cur_row_index = self.map_clicked_dlg.tableClickedWays.currentRow()
         if cur_row_index > -1:
-            self.clearMapselectedHighlight()
+            self.clearAllHighlights()
 
             f_geometry = QgsGeometry()
             f_geometry = QgsGeometry.fromWkt(
@@ -117,9 +151,15 @@ class IntersectionWays:
             self.buttonOk.setEnabled(False)
 
 
-    def clearMapselectedHighlight(self):
-        for i, h in enumerate(self.mapclicked_h_list):
-            self.mapclicked_h_list.pop(i)
+    def clearAllHighlights(self):
+        self.clearHighlight(self.mapclicked_h_list)
+        self.clearHighlight(self.intersected_h_list)
+        self.clearHighlight(self.intersection_h_list)
+
+
+    def clearHighlight(self, highlight_list):
+        for i, h in enumerate(highlight_list):
+            highlight_list.pop(i)
             self.iface.mapCanvas().scene().removeItem(h)
 
 
@@ -136,7 +176,9 @@ class IntersectionWays:
         result = self.sel_layer_dlg.exec_()
         if result:
             self.inters_layer = self.sel_layer_dlg.mMapLayerComboBox.currentLayer()
-            self.settings_layer = self.settings["modules"]["intersection_ways"]["layers"].get(self.inters_layer.name())
+            self.settings_layer = self.settings["modules"]["intersection_ways"]["layers"].get(
+                    self.inters_layer.name(), self.settings["modules"]["intersection_ways"]["layers"].get("*")
+                    )
             self.clearFiltersDlg() # очистить форму от фильтров
             self.addFiltersDlg() # добавить фильтры на форму
 
@@ -177,7 +219,7 @@ class IntersectionWays:
         table = self.map_clicked_dlg.tableClickedWays
         table.reset()
         self.current_layer_selected_fs = []
-        self.current_layer_selected_fs = CommonTools.populateTableByFeatures(
+        self.current_layer_selected_fs = CommonTools.populateTableByClickedFeatures(
                                                 self.current_layer, table)
 
         self.current_layer.removeSelection()
@@ -189,7 +231,7 @@ class IntersectionWays:
             self.calcIntersects()
             self.dockWidget.show()
         else:
-            self.clearMapselectedHighlight()
+            self.clearAllHighlights()
 
 
     def clearFiltersDlg(self):
@@ -208,52 +250,170 @@ class IntersectionWays:
                             self.map_clicked_dlg.groupBox_filter.layout(),
                             self.settings_layer)
 
-                    
+
     def calcIntersects(self):
         current_feature_idx = self.map_clicked_dlg.tableClickedWays.currentRow()
         current_feature_id = int(self.map_clicked_dlg.tableClickedWays.item(current_feature_idx, 0).text())
         current_feature = self.current_layer.getFeature(current_feature_id)   
 
         filters_dict = {}
-        for fieldname in self.settings_layer["filters_fields"]:
-            filters_dict[fieldname] = CommonTools.getFilterValues(fieldname, self.map_clicked_dlg.groupBox_filter.layout())
+        if self.settings_layer is not None:
+            for fieldname in self.settings_layer.get("filters_fields"):
+                filters_dict[fieldname] = CommonTools.getFilterValues(fieldname, self.map_clicked_dlg.groupBox_filter.layout())
             
         percent_inters = int(filters_dict.get("_percent", "0"))
-
-        if self.settings_layer is not None:
-            buffer_size = float(self.settings_layer.get("buffer_size", ".0"))
-        else:
-            buffer_size = .0
+        buffer_size = float(filters_dict.get("_buffer_size", "0.01"))
 
         cf_buffer = current_feature.geometry().buffer(buffer_size, 5)
 
-        il_selection_list = []
+        il_objects_result_dict = {}
+        il_fields_aliases_dict = self.inters_layer.attributeAliases()
 
-        addition_attributes = {}
+        # дополнительные пересекаемые слои (для вычисления количества общих пересечений)
+        additional_layers = self.getAdditionalLayerData()
 
         for intfeat in self.inters_layer.getFeatures():
             if intfeat.id() == current_feature_id and self.current_layer == self.inters_layer: #отсекаем сравниваемую линию
                 continue
             if intfeat.geometry().intersects(cf_buffer):
                 intfeat_buffer = intfeat.geometry().buffer(buffer_size, 5) # буфер пересекающихся линий, для отображения пересечений
-                intersection_buffers = QgsGeometry(cf_buffer).intersection(intfeat_buffer) # для отображения пересечений
+                intersection_buffer = QgsGeometry(cf_buffer).intersection(intfeat_buffer) # для отображения пересечений
                 intersection_line = QgsGeometry(current_feature.geometry()).intersection(intfeat_buffer) # части текущей линии, которые попали в буфер сравниваемого объекта
 
                 intfeat_length = intfeat.geometry().length()
                 intersection_line_length = intersection_line.length()
 
-                result_percent_inters = (intersection_line_length/intfeat_length)*100
+                result_percent_inters = (intersection_line_length/intfeat_length)*100 # процент - отношение длины пересечения к длине пересекаемого пути
                 if result_percent_inters >= percent_inters:
-                    il_selection_list.append(intfeat.id())
+                    # il_selection_list.append(intfeat.id())
 
-                    feat_attrs = {
+                    attrs_sys = {
+                        "feature_id": intfeat.id(),
+                        "WKT_inters_feature": intfeat.geometry().asWkt(),
+                        "WKT_intersection_buf": intersection_buffer.asWkt()
+                    }
+                    attrs_calculated = {
                         "Длина объекта": intfeat_length,
                         "Длина пересечения": intersection_line_length,
                         "Процент пересечения": result_percent_inters
                     }
-                    addition_attributes[intfeat.id()] = feat_attrs
 
-        self.inters_layer.select(il_selection_list)
+                    attrs_feature_layer = self.getDictFeaturesAttributes(intfeat, il_fields_aliases_dict)
+                    
+                    feat_attrs={}
+                    feat_attrs = {**attrs_sys, **attrs_feature_layer, **attrs_calculated} # объединение высчитываемых атрибутов и атрибутов слоя (объекта)
+                    
+                    attrs_additional_layer = self.getAdditionalLayersAttrs(additional_layers, intersection_line)
+                    feat_attrs = {**feat_attrs, **attrs_additional_layer}
+                    
+                    il_objects_result_dict[intfeat.id()] = feat_attrs
 
-        CommonTools.populateTableByFeatures(self.inters_layer, self.dockWidget.tableResult, addition_attributes)
+        self.setFilterLayer(self.inters_layer, list(il_objects_result_dict.keys()))
+        self.populateTableResult(self.dockWidget.tableResult, il_objects_result_dict)
         
+
+    def getDictFeaturesAttributes(self, intfeat, fields_aliases_dict):
+        feature_attributes = {}
+        if self.settings_layer is not None:
+            result_fields = self.settings_layer.get("result_fields")
+            if result_fields is not None:
+                for rf in result_fields:
+                    field_idx = self.inters_layer.fields().indexFromName(rf)
+                    if field_idx > -1:
+                        field = fields_aliases_dict[rf] if fields_aliases_dict[rf] else rf
+                        value = CommonTools.representFieldValueByType(field_idx, self.inters_layer, intfeat[rf])
+                        feature_attributes[field] = value
+                return feature_attributes
+        for key, value in fields_aliases_dict.items():
+            field = value if value else key
+            field_idx = self.inters_layer.fields().indexFromName(key)
+            feature_attributes[field] = CommonTools.representFieldValueByType(field_idx, self.inters_layer, intfeat[key])
+        return feature_attributes
+
+
+    def populateTableResult(self, table, objects_dict):
+        table.reset()
+        first_feature_data = list(objects_dict.items())[0][1]
+
+        headers_labels_list = list(first_feature_data.keys())
+        columns_cnt = len(headers_labels_list)
+        rows_cnt = len(list(objects_dict.keys()))
+        table.setRowCount(rows_cnt)
+        table.setColumnCount(columns_cnt)
+
+        for rownum, f_id in enumerate(objects_dict):
+            attr_values_list = list(objects_dict[f_id].values())
+            for columnnum, attr_value in enumerate(attr_values_list):
+                item = QTableWidgetItem()
+                item.setData(Qt.EditRole, attr_value)
+                table.setItem(rownum, columnnum, item)
+
+        table.setHorizontalHeaderLabels(headers_labels_list)
+        table.resizeColumnsToContents()
+        table.setColumnHidden(0, True)
+        table.setColumnHidden(1, True)
+        table.setColumnHidden(2, True)
+
+
+    def setFilterLayer(self, layer, features_ids=None):
+        subsetstring = ""
+        if features_ids is not None:
+            if len(features_ids) > 0:
+                if self.settings_layer:
+                    id_field = self.settings_layer.get('id_field', '$id')
+                else:
+                    id_field = '$id'
+                ids_string = ", ".join(map(str, features_ids))
+                subsetstring = f"{id_field} in ({ids_string})"
+        layer.setSubsetString(subsetstring)
+        
+        ltw = self.iface.layerTreeView()
+        ltw.refreshLayerSymbology(layer.id())
+
+
+    def getAdditionalLayerData(self):
+        if self.settings_layer:
+            additional_layers_data_list = []
+            additional_layers = self.settings_layer.get("additional_layers")
+            if additional_layers:
+                for layer_name in additional_layers:
+                    layers = QgsProject.instance().mapLayersByName(layer_name)
+                    if len(layers) > 1:
+                        print(f"В проекте более одного слоя с именем {layer_name}")
+                    if len(layers) == 0:
+                        print(f"В проекте не найдено ниодного слоя с именем {layer_name}")
+                        break
+                    layer = layers[0]
+
+                    add_buf_field = additional_layers[layer_name].get("buffer_field")
+                    additional_layers_data_list.append({"layer": layer, "add_buf_field": add_buf_field})
+            return additional_layers_data_list
+
+
+    def getAdditionalLayersAttrs(self, layers_data_list, intersection_geometry):
+        attributes_dict = {}
+
+        for layer_data in layers_data_list:
+            layer = layer_data["layer"]
+            features = layer.getFeatures(intersection_geometry.boundingBox())
+
+            cnt_intersects = 0
+            add_buf_field = layer_data["add_buf_field"]
+            for feat in features:
+                if add_buf_field:
+                    buffer_size = (feat[add_buf_field])
+                    print('0', buffer_size)
+                    if not (isinstance(feat[add_buf_field], int) or isinstance(feat[add_buf_field], float)):
+                        buffer_size = 0
+                    print('1', buffer_size)
+                    if intersection_geometry.intersects(feat.geometry().buffer(buffer_size, 5)):
+                        cnt_intersects+=1
+                else:
+                    if intersection_geometry.intersects(feat.geometry()):
+                        cnt_intersects+=1
+
+            attributes_dict[layer.name()] = cnt_intersects
+
+        return attributes_dict
+
+

@@ -2,6 +2,20 @@
     "modules":{
         "intersection_ways": {
             "layers": {
+                "*":{
+                    "filters_fields": {
+                        "_percent": {
+                            "label": "Минимальный процент пересечения",
+                            "source_type": "custom",
+                            "widget_type": "QSpinBox",
+                            "widget_options":{
+                                "setMaximum": "100",
+                                "setMinimum": "0",
+                                "setSingleStep": "5",
+                                "setSuffix": "%"                            }
+                        }
+                    }
+                },
                 "Маршрутная сеть": {
                     "filters_fields": {
                         "_percent": {
@@ -13,6 +27,17 @@
                                 "setMinimum": "0",
                                 "setSingleStep": "5",
                                 "setSuffix": "%"                            }
+                        },
+                        "_buffer_size": {
+                            "label": "Радиус погрешности",
+                            "source_type": "custom",
+                            "widget_type": "QDoubleSpinBox",
+                            "widget_options":{
+                                "setMaximum": "100",
+                                "setMinimum": "0",
+                                "setValue": "2.5",
+                                "setSingleStep": "0.5",
+                                "setSuffix": " м"                            }
                         },
                         "company": {
                             "label": "Компания",
@@ -28,9 +53,27 @@
                             "widget_type": "QComboBox",
                             "widget_options":{
                             }
+                        },
+                        "period_id": {
+                            "label": "Поколение",
+                            "source_type": "own",
+                            "widget_type": "QComboBox",
+                            "widget_options":{
+                            }
                         }
                     },
-                    "buffer_size": "2.5"
+                    "result_fields": [
+                        "number",
+                        "t_type",
+                        "company",
+                        "period_id"
+                    ],                   
+                    "id_field": "gid",
+                    "additional_layers": {
+                        "Остановочные пункты": {
+                            "buffer_field": "dist"
+                        }
+                    }
                 }
             }
         }
