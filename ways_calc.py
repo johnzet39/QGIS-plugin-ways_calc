@@ -187,7 +187,7 @@ class WaysCalc:
             # TODO: fix to allow choice of dock location
             self.iface.addDockWidget(Qt.RightDockWidgetArea, self.dockwidget)
             self.dockwidget.hide()
-            self.dockwidget.setWindowTitle(u'Маршрутная сеть: результат отбора')
+            self.dockwidget.setWindowTitle(u'WaysCalc')
 
     def onCurrentLayerChanged(self):
         self.iface.mapCanvas().unsetMapTool(self.pointEmitterIntersection)

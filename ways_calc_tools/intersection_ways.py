@@ -47,6 +47,7 @@ from .infrastructure import CommonTools
 
 import json
 import os
+from collections import OrderedDict
 
 class IntersectionWays:
     def __init__(self, iface, dockWidget):
@@ -80,6 +81,7 @@ class IntersectionWays:
         self.map_clicked_dlg.tableClickedWays.itemSelectionChanged.connect(self.onMapClickedTableSelChanged)
         self.dockWidget.tableResult.itemSelectionChanged.connect(self.onResultTableSelChanged)
         self.dockWidget.visibilityChanged.connect(self.onDockVisibilityChanged)
+        self.map_clicked_dlg.pushButton_reset.clicked.connect(self.resetClickedWaysFilters)
         self.initSettings()
 
 
@@ -88,6 +90,7 @@ class IntersectionWays:
         self.map_clicked_dlg.tableClickedWays.itemSelectionChanged.disconnect(self.onMapClickedTableSelChanged)
         self.dockWidget.tableResult.itemSelectionChanged.disconnect(self.onResultTableSelChanged)        
         self.dockWidget.visibilityChanged.disconnect(self.onDockVisibilityChanged)
+        self.map_clicked_dlg.pushButton_reset.clicked.disconnect(self.resetClickedWaysFilters)
         
         self.clearAllHighlights()
 
@@ -95,6 +98,11 @@ class IntersectionWays:
     def initSettings(self):
         with open(os.path.join(self.plugin_dir, "..\settings.json"), "r") as read_file:
             self.settings = json.load(read_file)
+
+
+    def resetClickedWaysFilters(self):
+        self.clearFiltersDlg() # очистить форму от фильтров
+        self.addFiltersDlg() # добавить фильтры на форму
 
 
     def onDockVisibilityChanged(self):
@@ -373,6 +381,8 @@ class IntersectionWays:
 
                     il_objects_result_dict[intfeat.id()] = feat_attrs
 
+        il_objects_result_dict = OrderedDict(sorted(il_objects_result_dict.items(), 
+                                  key=lambda kv: kv[1]["Процент пересечения"], reverse=True))
         self.setFilterLayer(self.inters_layer, list(il_objects_result_dict.keys()))
         self.populateTableResult(self.dockWidget.tableResult, il_objects_result_dict)
             
