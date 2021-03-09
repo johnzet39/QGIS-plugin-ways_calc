@@ -113,7 +113,6 @@ class CommonTools:
         filter_widget = CommonTools.__createWidget(field, layer, settings_layer)
         
         layout.addRow(filter_label, filter_widget)
-        # print(getattr(QtWidgets, 'QSpinBox')())
 
 
     @staticmethod
@@ -160,6 +159,11 @@ class CommonTools:
                     elif widget_type == "QComboBox":
                         filter_widget.addItem(key, QVariant(value))
                         filter_widget.setCurrentIndex(-1)
+
+        elif settings_field["source_type"] == "custom":
+            if widget_type == "QComboBox":
+                filter_widget.setCurrentIndex(-1)
+                filter_widget.addItem(None, QVariant(None))
 
         return filter_widget
 

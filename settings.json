@@ -28,6 +28,18 @@
                                 "setSingleStep": "5",
                                 "setSuffix": "%"                            }
                         },
+                        "_by_addition_layer": {
+                            "label": "Процент по общим объектам из",
+                            "source_type": "custom",
+                            "widget_type": "QComboBox",
+                            "widget_options":{
+                            },
+                            "additional_layers": {
+                                "Остановочные пункты": {
+                                    "buffer_field": "dist"
+                                }
+                            }
+                        },
                         "_buffer_size": {
                             "label": "Радиус погрешности",
                             "source_type": "custom",
@@ -68,12 +80,7 @@
                         "company",
                         "period_id"
                     ],                   
-                    "id_field": "gid",
-                    "additional_layers": {
-                        "Остановочные пункты": {
-                            "buffer_field": "dist"
-                        }
-                    }
+                    "id_field": "gid"
                 }
             }
         }
