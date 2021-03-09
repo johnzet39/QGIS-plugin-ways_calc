@@ -102,6 +102,7 @@ class IntersectionWays:
             self.clearAllHighlights()
             self.setFilterLayer(self.inters_layer)
             self.current_layer.removeSelection()
+            self.dockWidget.setWindowTitle("WaysCalc")
 
 
     def onResultTableSelChanged(self):
@@ -182,6 +183,7 @@ class IntersectionWays:
             self.settings_layer = self.settings["modules"]["intersection_ways"]["layers"].get(
                     self.inters_layer.name(), self.settings["modules"]["intersection_ways"]["layers"].get("*")
                     )
+            self.dockWidget.setWindowTitle("WaysCalc: " + self.inters_layer.name())
             self.clearFiltersDlg() # очистить форму от фильтров
             self.addFiltersDlg() # добавить фильтры на форму
             self.populateComboByLayers()
@@ -282,6 +284,11 @@ class IntersectionWays:
         buffer_size = float(filters_dict.get("_buffer_size", "0.01"))
         layer_by_percent = (filters_dict.get("_by_addition_layer")) # слой, по пересечению объектов которых будет высчитываться процент пересечения
 
+        if layer_by_percent:
+            self.dockWidget.labelResult.setText(f"Результат отбора по общим объектам в слое <{layer_by_percent.name()}>")
+        else:
+            self.dockWidget.labelResult.setText(f"Результат отбора по длине пересечений")
+
         cf_buffer = current_feature.geometry().buffer(buffer_size, 5)
 
         il_objects_result_dict = {}
@@ -314,8 +321,14 @@ class IntersectionWays:
 
                 
                 if layer_by_percent: # если сравнивать по общим пересекаемыым объектам, а не по длине
-                    attrs_add_layers_for_intfeat = self.getAdditionalLayersAttrs(additional_layers, intfeat.geometry(), 'Объекты в ')
-                    attrs_add_layers_for_intersection = self.getAdditionalLayersAttrs(additional_layers, intersection_line, 'Общее в ')
+                    attrs_add_layers_for_intfeat = self.getAdditionalLayersAttrs(
+                                                            additional_layers,
+                                                            intfeat.geometry(),
+                                                            'Объекты в ')
+                    attrs_add_layers_for_intersection = self.getAdditionalLayersAttrs(
+                                                            additional_layers,
+                                                            intersection_line,
+                                                            'Общее в ')
                     cnt_intfeat_by_layer = attrs_add_layers_for_intfeat['Объекты в '+layer_by_percent.name()]
                     cnt_intersection_by_layer = attrs_add_layers_for_intersection['Общее в '+layer_by_percent.name()]
 
@@ -324,7 +337,8 @@ class IntersectionWays:
                     else:
                         result_percent_inters = (cnt_intersection_by_layer/cnt_intfeat_by_layer)*100
                 else: # если сравнивать по длине
-                    result_percent_inters = (intersection_line_length/intfeat_length)*100 # процент - отношение длины пересечения к длине пересекаемого пути
+                    # процент - отношение длины пересечения к длине пересекаемого пути
+                    result_percent_inters = (intersection_line_length/intfeat_length)*100 
 
                 if result_percent_inters >= percent_inters:
                     attrs_sys = {
@@ -340,14 +354,23 @@ class IntersectionWays:
                     attrs_feature_layer = self.getDictFeaturesAttributes(intfeat, il_fields_aliases_dict)
 
                     if not attrs_add_layers_for_intfeat:
-                        attrs_add_layers_for_intfeat = self.getAdditionalLayersAttrs(additional_layers, intfeat.geometry(), 'Объекты в ')
+                        attrs_add_layers_for_intfeat = self.getAdditionalLayersAttrs(
+                                                            additional_layers,
+                                                            intfeat.geometry(), 
+                                                            'Объекты в ')
                     if not attrs_add_layers_for_intersection:
-                        attrs_add_layers_for_intersection = self.getAdditionalLayersAttrs(additional_layers, intersection_line, 'Общее в ')
+                        attrs_add_layers_for_intersection = self.getAdditionalLayersAttrs(
+                                                            additional_layers,
+                                                            intersection_line,
+                                                            'Общее в ')
 
                     feat_attrs={}
-                    feat_attrs = {**attrs_sys, **attrs_feature_layer, **attrs_calculated, **attrs_add_layers_for_intfeat} # объединение высчитываемых атрибутов и атрибутов слоя (объекта)
-                    feat_attrs = {**feat_attrs, **attrs_add_layers_for_intersection}
-                    
+                    feat_attrs = {**attrs_sys,
+                                  **attrs_feature_layer,
+                                  **attrs_calculated,
+                                  **attrs_add_layers_for_intfeat,
+                                  **attrs_add_layers_for_intersection} # объединение высчитываемых атрибутов и атрибутов слоя (объекта)
+
                     il_objects_result_dict[intfeat.id()] = feat_attrs
 
         self.setFilterLayer(self.inters_layer, list(il_objects_result_dict.keys()))
