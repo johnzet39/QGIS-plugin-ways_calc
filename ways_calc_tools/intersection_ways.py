@@ -279,6 +279,8 @@ class IntersectionWays:
 
 
     def calcIntersects(self):
+        self.setFilterLayer(self.inters_layer)
+
         current_feature_idx = self.map_clicked_dlg.tableClickedWays.currentRow()
         current_feature_id = int(self.map_clicked_dlg.tableClickedWays.item(current_feature_idx, 0).text())
         current_feature = self.current_layer.getFeature(current_feature_id)   
