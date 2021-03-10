@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>575</width>
-    <height>499</height>
+    <height>359</height>
    </rect>
   </property>
   <property name="minimumSize">
@@ -31,6 +31,12 @@
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
     <widget class="QTableWidget" name="tableClickedWays">
+     <property name="minimumSize">
+      <size>
+       <width>0</width>
+       <height>200</height>
+      </size>
+     </property>
      <property name="font">
       <font>
        <pointsize>8</pointsize>
@@ -41,9 +47,6 @@
      </property>
      <property name="editTriggers">
       <set>QAbstractItemView::NoEditTriggers</set>
-     </property>
-     <property name="dragEnabled">
-      <bool>true</bool>
      </property>
      <property name="selectionMode">
       <enum>QAbstractItemView::SingleSelection</enum>

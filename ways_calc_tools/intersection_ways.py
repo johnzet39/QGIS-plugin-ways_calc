@@ -212,7 +212,9 @@ class IntersectionWays:
             self.iface.messageBar().pushMessage(f'Выберите векторный линейный слой, содержащий объект сравнения', f'', duration=5, level=2)
             return False
 
-        if self.inters_layer is None:
+        try:
+            self.inters_layer.id()
+        except:
             self.initLayerWays(current_layer)
 
         if self.current_layer is None or self.inters_layer is None:

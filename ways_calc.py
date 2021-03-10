@@ -210,7 +210,6 @@ class WaysCalc:
         self.init_dock()
         if self.IW is None:
             self.init_IW()
-        # self.run_initLayerWays()
         if self.IW.checkLayers():    
             self.iface.mapCanvas().setMapTool(self.pointEmitterIntersection)
 
