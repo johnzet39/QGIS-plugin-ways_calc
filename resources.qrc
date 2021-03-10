@@ -1,5 +1,6 @@
 <RCC>
     <qresource prefix="/plugins/_Ways_calc" >
         <file>icon.png</file>
+        <file>icons/copy_16.png</file>
     </qresource>
 </RCC>

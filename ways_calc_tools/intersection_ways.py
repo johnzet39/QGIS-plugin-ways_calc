@@ -24,7 +24,8 @@
 from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication, Qt, QObject, QVariant
 from qgis.PyQt.QtGui import QIcon, QColor
 from qgis.PyQt import QtWidgets
-from qgis.PyQt.QtWidgets import QAction, QTableWidgetItem, QListWidget, QListWidgetItem, QDialogButtonBox
+from qgis.PyQt.QtWidgets import (QAction, QTableWidgetItem, QListWidget,
+                                 QListWidgetItem, QDialogButtonBox, QApplication)
 from qgis.core import (
     QgsProject,
     QgsVectorLayer,
@@ -87,6 +88,7 @@ class IntersectionWays:
         self.dockWidget.tableResult.itemSelectionChanged.connect(self.onResultTableSelChanged)
         self.dockWidget.visibilityChanged.connect(self.onDockVisibilityChanged)
         self.map_clicked_dlg.pushButton_reset.clicked.connect(self.resetClickedWaysFilters)
+        self.dockWidget.copyButton.clicked.connect(self.copyResult)
         self.initSettings()
 
 
@@ -95,8 +97,34 @@ class IntersectionWays:
         self.dockWidget.tableResult.itemSelectionChanged.disconnect(self.onResultTableSelChanged)        
         self.dockWidget.visibilityChanged.disconnect(self.onDockVisibilityChanged)
         self.map_clicked_dlg.pushButton_reset.clicked.disconnect(self.resetClickedWaysFilters)
+        self.dockWidget.copyButton.clicked.disconnect(self.copyResult)
         
         self.clearAllHighlights()
+
+
+    def copyResult(self):
+        table = self.dockWidget.tableResult
+        colcount = table.columnCount()
+        rowcount = table.rowCount()
+        rowStrings = []
+        rowStrings.append('"' + self.dockWidget.labelResult.text().replace('\n', ' ') + '"')
+        columns_idx_list = list(range(colcount))
+        del columns_idx_list[1:3]
+        headers = [table.horizontalHeaderItem(col).text() for col in columns_idx_list]
+        headers_row = '\t'.join('"' + item + '"' for item in headers)
+        rowStrings.append(headers_row)
+
+        for rowIndex in range(rowcount):
+            rowItemsStrings = []
+            for columnIndex in columns_idx_list:
+                item = table.item(rowIndex, columnIndex)
+                itemText = '""'
+                if item:
+                    itemText = '"' + item.text().replace('"', '""') + '"'
+                rowItemsStrings.append(itemText)
+            rowStrings.append('\t'.join(rowItemsStrings))
+        result_string = '\n'.join(rowStrings)
+        QApplication.clipboard().setText(result_string)
 
 
     def initSettings(self):
@@ -116,7 +144,6 @@ class IntersectionWays:
             self.clearAllHighlights()
             self.setFilterLayer(self.inters_layer)
             self.current_layer.removeSelection()
-            self.dockWidget.setWindowTitle("WaysCalc")
 
 
     def onResultTableSelChanged(self):
@@ -197,7 +224,6 @@ class IntersectionWays:
             self.settings_layer = self.settings["modules"]["intersection_ways"]["layers"].get(
                     self.inters_layer.name(), self.settings["modules"]["intersection_ways"]["layers"].get("*")
                     )
-            self.dockWidget.setWindowTitle("WaysCalc: " + self.inters_layer.name())
             self.clearFiltersDlg() # очистить форму от фильтров
             self.addFiltersDlg() # добавить фильтры на форму
 
@@ -248,6 +274,10 @@ class IntersectionWays:
         self.current_layer.removeSelection()
 
         self.setButtonOkStatus()
+        self.map_clicked_dlg.setWindowFlags(
+                                self.map_clicked_dlg.windowFlags() |
+                                Qt.WindowStaysOnTopHint |
+                                Qt.WindowMinMaxButtonsHint)
         self.map_clicked_dlg.show()
         result = self.map_clicked_dlg.exec_()
         if result:
@@ -341,11 +371,13 @@ class IntersectionWays:
             additional_layers = self.getAdditionalLayerData() # дополнительные пересекаемые слои (для вычисления количества общих пересечений)
 
             if layer_by_percent: # если сравнение по общим объектам дополнительного слоя
-                self.dockWidget.labelResult.setText(f"Результат отбора по общим объектам в слое <{layer_by_percent.name()}>."
-                                                    f" (Id объекта: {current_feature_id}. Длина объекта: {current_feature_length}) м.")
+                self.dockWidget.labelResult.setText(f"Слой <{self.inters_layer.name()}>.\n"
+                                                    f"Результат отбора по общим объектам в слое <{layer_by_percent.name()}>.\n"
+                                                    f"(Id объекта: {current_feature_id}. Длина объекта: {current_feature_length}) м.")
             else: # если сравнение по длине
-                self.dockWidget.labelResult.setText(f"Результат отбора по длине пересечений"
-                                                    f" (Id объекта: {current_feature_id}. Длина объекта: {current_feature_length} м.)")
+                self.dockWidget.labelResult.setText(f"Слой <{self.inters_layer.name()}>.\n"
+                                                    f"Результат отбора по длине пересечений.\n"
+                                                    f"(Id объекта: {current_feature_id}. Длина объекта: {current_feature_length} м.)")
 
             # генерация фильтра для получения всех объектов слоя
             filter_expression = self.generateFilterExpression(filters_dict)
@@ -403,9 +435,9 @@ class IntersectionWays:
                             "WKT_intersection_line": intersection_line.asWkt()
                         }
                         attrs_calculated = {
-                            "Длина объекта": intfeat_length,
-                            "Длина пересечения": intersection_line_length,
-                            "Процент пересечения": result_percent_inters
+                            "Длина объекта": round(intfeat_length, 2),
+                            "Длина пересечения": round(intersection_line_length, 2),
+                            "Процент пересечения": round(result_percent_inters, 2)
                         }
                         attrs_feature_layer = self.getDictFeaturesAttributes(intfeat, il_fields_aliases_dict)
 

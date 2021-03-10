@@ -72,7 +72,7 @@ class WaysCalc:
 
         # Declare instance attributes
         self.actions = []
-        self.menu = self.tr(u'&Ways Calc')
+        self.menu = self.tr(u'&WaysCalc')
         # TODO: We are going to let the user set this up in a future iteration
         # self.toolbar = self.iface.addToolBar(u'WaysCalc')
         # self.toolbar.setObjectName(u'WaysCalc')
@@ -114,17 +114,18 @@ class WaysCalc:
 
         self.action_intersection = QAction(
                 QIcon(":/plugins/_Ways_calc/icon.png"),
-                u'Поиск совпадающих маршрутов',
+                u'Поиск пересечений линейных объектов',
                 self.iface.mainWindow())
         self.action_initLayerWays = QAction(
-                u"Выбор слоя для сравнения",
+                u"Выбор слоя для поиска пересечений",
                 self.iface.mainWindow())
 
-        self.iface.addPluginToMenu(u"Маршрутная сеть", self.action_intersection)
-        self.iface.addPluginToMenu(u"Маршрутная сеть", self.action_initLayerWays)
+        self.iface.addPluginToMenu(u"WaysCalc", self.action_intersection)
+        self.iface.addPluginToMenu(u"WaysCalc", self.action_initLayerWays)
         # self.iface.addToolBarIcon(self.action_intersection)
         m = self.toolButton.menu()
         m.addAction(self.action_intersection)
+        m.addAction(self.action_initLayerWays)
         self.toolButton.setDefaultAction(self.action_intersection)
 
         self.action_intersection.triggered.connect(self.run_intersection) # пересекающиеся маршруты
@@ -133,10 +134,7 @@ class WaysCalc:
         self.pointEmitterIntersection = QgsMapToolEmitPoint(self.iface.mapCanvas())
         self.pointEmitterIntersection.setAction(self.action_intersection)
         self.pointEmitterIntersection.canvasClicked.connect(self.pointEmitterIntersectioncanvasClicked)
-
         self.iface.mapCanvas().currentLayerChanged.connect(self.onCurrentLayerChanged)
-
-        # self.loadSettings()
 
     #--------------------------------------------------------------------------
 
@@ -149,48 +147,37 @@ class WaysCalc:
 
     def unload(self):
         """Removes the plugin menu item and icon from QGIS GUI."""
-        self.iface.removePluginMenu(u"Маршрутная сеть", self.action_intersection)
-        self.iface.removePluginMenu(u"Маршрутная сеть", self.action_initLayerWays)
+        self.iface.removePluginMenu(u"WaysCalc", self.action_intersection)
+        self.iface.removePluginMenu(u"WaysCalc", self.action_initLayerWays)
         self.iface.removeToolBarIcon(self.action_intersection)
         self.iface.removeToolBarIcon(self.toolButton_action)
 
-        #print "** UNLOAD WaysCalc"
         self.action_intersection.triggered.disconnect(self.run_intersection) # пересекающиеся маршруты
         self.action_initLayerWays.triggered.disconnect(self.run_initLayerWays) # выбор слоя сравнения
-
         self.pointEmitterIntersection.canvasClicked.connect(self.pointEmitterIntersectioncanvasClicked)
-
         self.iface.mapCanvas().currentLayerChanged.disconnect(self.onCurrentLayerChanged)
 
         if self.IW is not None:
             self.IW.onUnLoadModule()
+
 
     def init_dock(self):
         """Run method that loads and starts the plugin"""
 
         if not self.pluginIsActive:
             self.pluginIsActive = True
-
-            #print "** STARTING WaysCalc"
-
-            # dockwidget may not exist if:
-            #    first run of plugin
-            #    removed on close (see self.onClosePlugin method)
             if self.dockwidget == None:
-                # Create the dockwidget (after translation) and keep reference
                 self.dockwidget = WaysCalcDockWidget()
-
-            # connect to provide cleanup on closing of dockwidget
             self.dockwidget.closingPlugin.connect(self.onClosePlugin)
 
-            # show the dockwidget
-            # TODO: fix to allow choice of dock location
             self.iface.addDockWidget(Qt.RightDockWidgetArea, self.dockwidget)
             self.dockwidget.hide()
             self.dockwidget.setWindowTitle(u'WaysCalc')
 
+
     def onCurrentLayerChanged(self):
         self.iface.mapCanvas().unsetMapTool(self.pointEmitterIntersection)
+
 
     #--------------------------------------------------------------------------
 
