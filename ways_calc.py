@@ -210,13 +210,10 @@ class WaysCalc:
         self.init_dock()
         if self.IW is None:
             self.init_IW()
+        # self.run_initLayerWays()
         if self.IW.checkLayers():    
             self.iface.mapCanvas().setMapTool(self.pointEmitterIntersection)
-            # self.iface.messageBar().pushMessage(
-            #     u"Выберите линию",
-            #     u"Для сброса щелкните на карте вне объектов",
-            #     duration=8,
-            #     level=4)
+
 
     def pointEmitterIntersectioncanvasClicked(self, point, button):
         self.IW.insersection_take_way(point)
