@@ -138,8 +138,11 @@ class IntersectionWays:
 
 
     def onDockVisibilityChanged(self):
-        ltw = self.iface.layerTreeView()
-        ltw.refreshLayerSymbology(self.inters_layer.id())
+        try:
+            ltw = self.iface.layerTreeView()
+            ltw.refreshLayerSymbology(self.inters_layer.id())
+        except:
+            pass
         if self.dockWidget.isHidden():
             self.clearAllHighlights()
             self.setFilterLayer(self.inters_layer)
