@@ -346,6 +346,9 @@ class IntersectionWays:
                     layer = laydata["layer"]
                     widget.addItem(layer.name(), QVariant(layer))
                 widget.setCurrentIndex(-1)
+                widget.setEnabled(True)
+            else:
+                widget.setEnabled(False)
 
 
     def calcIntersects(self, task):
