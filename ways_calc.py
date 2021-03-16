@@ -32,6 +32,7 @@ from qgis.gui import QgsMapToolEmitPoint
 from .resources import *
 
 from .ways_calc_tools.intersection_ways import IntersectionWays
+from .ways_calc_tools.intersection_all_ways import IntersectionAllWays
 
 # Import the code for the DockWidget
 from .ways_calc_dockwidget import WaysCalcDockWidget
@@ -84,6 +85,7 @@ class WaysCalc:
         # self.settings = None
 
         self.IW = None #IntersectionWays
+        self.IAW = None #IntersectionAllWays
 
 
     # noinspection PyMethodMayBeStatic
@@ -119,16 +121,24 @@ class WaysCalc:
         self.action_initLayerWays = QAction(
                 u"Выбор слоя для поиска пересечений",
                 self.iface.mainWindow())
+        self.action_allintersection = QAction(
+                QIcon(":/plugins/_Ways_calc/icon.png"),
+                u'Поиск пересечений всех линейных объектов',
+                self.iface.mainWindow())
 
         self.iface.addPluginToMenu(u"WaysCalc", self.action_intersection)
         self.iface.addPluginToMenu(u"WaysCalc", self.action_initLayerWays)
+        self.iface.addPluginToMenu(u"WaysCalc", self.action_allintersection)
         # self.iface.addToolBarIcon(self.action_intersection)
         m = self.toolButton.menu()
         m.addAction(self.action_intersection)
         m.addAction(self.action_initLayerWays)
+        m.addSeparator()
+        m.addAction(self.action_allintersection)
         self.toolButton.setDefaultAction(self.action_intersection)
 
         self.action_intersection.triggered.connect(self.run_intersection) # пересекающиеся маршруты
+        self.action_allintersection.triggered.connect(self.run_allintersection) # пересекающиеся все маршруты
         self.action_initLayerWays.triggered.connect(self.run_initLayerWays) # выбор слоя сравнения
 
         self.pointEmitterIntersection = QgsMapToolEmitPoint(self.iface.mapCanvas())
@@ -148,11 +158,14 @@ class WaysCalc:
     def unload(self):
         """Removes the plugin menu item and icon from QGIS GUI."""
         self.iface.removePluginMenu(u"WaysCalc", self.action_intersection)
+        self.iface.removePluginMenu(u"WaysCalc", self.action_allintersection)
         self.iface.removePluginMenu(u"WaysCalc", self.action_initLayerWays)
+        self.iface.removeToolBarIcon(self.action_intersection)
         self.iface.removeToolBarIcon(self.action_intersection)
         self.iface.removeToolBarIcon(self.toolButton_action)
 
         self.action_intersection.triggered.disconnect(self.run_intersection) # пересекающиеся маршруты
+        self.action_allintersection.triggered.disconnect(self.run_allintersection) # пересекающиеся все маршруты
         self.action_initLayerWays.triggered.disconnect(self.run_initLayerWays) # выбор слоя сравнения
         self.pointEmitterIntersection.canvasClicked.connect(self.pointEmitterIntersectioncanvasClicked)
         self.iface.mapCanvas().currentLayerChanged.disconnect(self.onCurrentLayerChanged)
@@ -209,3 +222,13 @@ class WaysCalc:
         self.IW = IntersectionWays(self.iface, self.dockwidget)
 
     #-------- END INTERSECTION WAYS---------------------------------------------
+
+
+    def init_IAW(self):
+        self.IAW = IntersectionAllWays(self.iface, self.dockwidget)
+
+    def run_allintersection(self):
+        self.init_dock()
+        if self.IAW is None:
+            self.init_IAW()
+        self.IAW.showClickedFeaturesList()

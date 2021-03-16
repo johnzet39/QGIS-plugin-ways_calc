@@ -21,6 +21,7 @@
  ***************************************************************************/
 """
 
+import sys
 from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication, Qt, QObject, QVariant
 from qgis.PyQt.QtGui import QIcon, QColor
 from qgis.PyQt import QtWidgets
@@ -54,7 +55,7 @@ import json
 import os
 from collections import OrderedDict
 
-class IntersectionWays:
+class IntersectionAllWays:
     def __init__(self, iface, dockWidget):
         print("__init__")
         self.iface = iface
@@ -66,25 +67,20 @@ class IntersectionWays:
         self.buttonOk = self.map_clicked_dlg.button_box.button( QDialogButtonBox.Ok )
         self.filter_layout = self.map_clicked_dlg.groupBox_filter.layout()
 
-        self.inters_layer = None # слой сравнения
         self.current_layer = None # текущий выбранный слой
-        self.current_layer_selected_fs = None # объекты, которые попали под курсор на карте (лист словарей)
 
         self.settings = None
         self.settings_layer = None
 
         #highlights
-        self.mapclicked_h_list = []
         self.intersected_h_list = []
-        self.intersection_h_list = []
 
-        self.MESSAGE_CATEGORY = "IntersectionWays"
+        self.MESSAGE_CATEGORY = "IntersectionAllWays"
 
         self.onLoadModule()
 
 
     def onLoadModule(self):
-        self.map_clicked_dlg.tableClickedWays.itemSelectionChanged.connect(self.onMapClickedTableSelChanged)
         self.dockWidget.tableResult.itemSelectionChanged.connect(self.onResultTableSelChanged)
         self.dockWidget.visibilityChanged.connect(self.onDockVisibilityChanged)
         self.map_clicked_dlg.pushButton_reset.clicked.connect(self.resetClickedWaysFilters)
@@ -109,7 +105,7 @@ class IntersectionWays:
         rowStrings = []
         rowStrings.append('"' + self.dockWidget.labelResult.text().replace('\n', ' ') + '"')
         columns_idx_list = list(range(colcount))
-        del columns_idx_list[1:3]
+        del columns_idx_list[1:2]
         headers = [table.horizontalHeaderItem(col).text() for col in columns_idx_list]
         headers_row = '\t'.join('"' + item + '"' for item in headers)
         rowStrings.append(headers_row)
@@ -138,14 +134,8 @@ class IntersectionWays:
 
 
     def onDockVisibilityChanged(self):
-        try:
-            ltw = self.iface.layerTreeView()
-            ltw.refreshLayerSymbology(self.inters_layer.id())
-        except:
-            pass
         if self.dockWidget.isHidden():
             self.clearAllHighlights()
-            self.setFilterLayer(self.inters_layer)
             self.current_layer.removeSelection()
 
 
@@ -153,56 +143,19 @@ class IntersectionWays:
         cur_row_index = self.dockWidget.tableResult.currentRow()
         if cur_row_index > -1:
             self.clearHighlight(self.intersected_h_list)
-            self.clearHighlight(self.intersection_h_list)
 
             f_geometry = QgsGeometry()
             f_geometry = QgsGeometry.fromWkt(
                     self.dockWidget.tableResult.item(cur_row_index, 1).text())
-            h = QgsHighlight(self.iface.mapCanvas(), f_geometry, self.inters_layer)
-            h.setColor(QColor(26, 200, 0, 220))
-            h.setWidth(6)
-            h.setFillColor(QColor(26, 200, 0, 150))
-            self.intersected_h_list.append(h)
-
-            if_geometry = QgsGeometry()
-            if_geometry = QgsGeometry.fromWkt(
-                    self.dockWidget.tableResult.item(cur_row_index, 2).text())
-            ih = QgsHighlight(self.iface.mapCanvas(), if_geometry, self.inters_layer)
-            ih.setColor(QColor(230,0,0,220))
-            ih.setWidth(6)
-            ih.setFillColor(QColor(230,0,0,150))
-            self.intersection_h_list.append(ih)
-
-
-    def onMapClickedTableSelChanged(self):
-        cur_row_index = self.map_clicked_dlg.tableClickedWays.currentRow()
-        if cur_row_index > -1:
-            self.clearAllHighlights()
-
-            f_geometry = QgsGeometry()
-            f_geometry = QgsGeometry.fromWkt(
-                    self.map_clicked_dlg.tableClickedWays.item(cur_row_index, 1).text())
-
             h = QgsHighlight(self.iface.mapCanvas(), f_geometry, self.current_layer)
             h.setColor(QColor(0, 15, 183, 220))
             h.setWidth(6)
             h.setFillColor(QColor(0, 15, 183, 150))
-            self.mapclicked_h_list.append(h)
-
-        self.setButtonOkStatus()
-
-
-    def setButtonOkStatus(self):
-        if self.map_clicked_dlg.tableClickedWays.currentRow() > -1:
-            self.buttonOk.setEnabled(True)
-        else:
-            self.buttonOk.setEnabled(False)
+            self.intersected_h_list.append(h)
 
 
     def clearAllHighlights(self):
-        self.clearHighlight(self.mapclicked_h_list)
-        self.clearHighlight(self.intersected_h_list)
-        self.clearHighlight(self.intersection_h_list)
+        self.clearHighlight(self.intersected_h_list) 
 
 
     def clearHighlight(self, highlight_list):
@@ -215,68 +168,23 @@ class IntersectionWays:
         print('deleted')
 
 
-    def initLayerWays(self, current_layer = None):
-        self.sel_layer_dlg.mMapLayerComboBox.setFilters(QgsMapLayerProxyModel.LineLayer)
-        if current_layer is not None:
-            if current_layer.geometryType() ==  QgsWkbTypes.LineGeometry:
-                self.sel_layer_dlg.mMapLayerComboBox.setLayer(current_layer)
-        self.sel_layer_dlg.show()
-        result = self.sel_layer_dlg.exec_()
-        if result:
-            self.inters_layer = self.sel_layer_dlg.mMapLayerComboBox.currentLayer()
-            self.settings_layer = self.settings["modules"]["intersection_ways"]["layers"].get(
-                    self.inters_layer.name(), self.settings["modules"]["intersection_ways"]["layers"].get("*")
-                    )
-            self.clearFiltersDlg() # очистить форму от фильтров
-            self.addFiltersDlg() # добавить фильтры на форму
-
-
-    def checkLayers(self):
-        current_layer = self.iface.activeLayer()
-        if (current_layer is not None and
-                type(current_layer) == QgsVectorLayer and
-                current_layer.geometryType() ==  QgsWkbTypes.LineGeometry):
-            self.current_layer = current_layer
-        else:
-            self.iface.messageBar().pushMessage(f'Выберите векторный линейный слой, содержащий объект сравнения', f'', duration=5, level=2)
-            return False
-
-        try:
-            self.inters_layer.id()
-        except:
-            self.initLayerWays(current_layer)
-
-        if self.current_layer is None or self.inters_layer is None:
-            return False
-        return True
-    
-    
-    def insersection_take_way(self, point):
-        self.current_layer.removeSelection()
-        width = self.iface.mapCanvas().mapUnitsPerPixel() * 5
-        rect = QgsRectangle(point.x() - width,
-            point.y() - width,
-            point.x() + width,
-            point.y() + width)
-        self.current_layer.selectByRect(rect)
-
-        if self.current_layer.selectedFeatureCount() > 0:
-            # self.iface.messageBar().clearWidgets()
-            self.showClickedFeaturesList()
-
-
     def showClickedFeaturesList(self):
+        self.map_clicked_dlg.tableClickedWays.setVisible(False)
+        self.current_layer = self.iface.activeLayer()
+        if self.current_layer is None:
+            self.iface.messageBar().pushMessage(f'Выберите векторный линейный слой, содержащий объекты сравнения', f'', duration=5, level=2)
+            return
+        self.current_layer.removeSelection()
+
+        self.settings_layer = self.settings["modules"]["intersection_ways"]["layers"].get(
+                    self.current_layer.name(), self.settings["modules"]["intersection_ways"]["layers"].get("*")
+                    )
+
+        self.clearFiltersDlg() # очистить форму от фильтров
+        self.addFiltersDlg() # добавить фильтры на форму
+
         self.populateComboByLayers()
 
-        table = self.map_clicked_dlg.tableClickedWays
-        table.reset()
-        self.current_layer_selected_fs = []
-        self.current_layer_selected_fs = CommonTools.populateTableByClickedFeatures(
-                                                self.current_layer, table)
-
-        self.current_layer.removeSelection()
-
-        self.setButtonOkStatus()
         self.map_clicked_dlg.setWindowFlags(
                                 self.map_clicked_dlg.windowFlags() |
                                 Qt.WindowStaysOnTopHint |
@@ -292,7 +200,7 @@ class IntersectionWays:
     def createTaskCalcIntersects(self):
         taskManager = QgsApplication.taskManager()
         self.task1 = QgsTask.fromFunction(
-            'IntersectionWays', self.calcIntersects, on_finished=self.completed)
+            self.MESSAGE_CATEGORY, self.calcIntersects, on_finished=self.completed)
         taskManager.addTask(self.task1)
 
 
@@ -329,7 +237,7 @@ class IntersectionWays:
                     for field in ava_filters_fields:
                         CommonTools.addFilter(
                             field,
-                            self.inters_layer,
+                            self.current_layer,
                             self.filter_layout,
                             self.settings_layer)
 
@@ -356,121 +264,151 @@ class IntersectionWays:
             QgsMessageLog.logMessage('Started task {}'.format(task.description()),
                                     self.MESSAGE_CATEGORY, Qgis.Info)
 
-            self.setFilterLayer(self.inters_layer)
-
             filters_dict = {}
             if self.settings_layer is not None:
                 for fieldname in self.settings_layer.get("filters_fields"):
                     filters_dict[fieldname] = CommonTools.getFilterValues(fieldname, self.filter_layout)
 
-            current_feature_idx = self.map_clicked_dlg.tableClickedWays.currentRow()
-            current_feature_id = int(self.map_clicked_dlg.tableClickedWays.item(current_feature_idx, 0).text())
-            current_feature = self.current_layer.getFeature(current_feature_id)
-            current_feature_geom = current_feature.geometry()
-            current_feature_length = round(current_feature_geom.length(), 2)
+            
             percent_inters = int(filters_dict.get("_percent", "0"))
             buffer_size = float(filters_dict.get("_buffer_size", "0.01"))
             layer_by_percent = (filters_dict.get("_by_addition_layer")) # слой, по пересечению объектов которых будет высчитываться процент пересечения
-            current_feature_buf = current_feature_geom.buffer(buffer_size, 5)
-            il_objects_result_dict = {} # конечный результат отобранных пересекаемых объектов
-            il_fields_aliases_dict = self.inters_layer.attributeAliases() # алиасы полей слоя
-            additional_layers = self.getAdditionalLayerData() # дополнительные пересекаемые слои (для вычисления количества общих пересечений)
-
-            if layer_by_percent: # если сравнение по общим объектам дополнительного слоя
-                self.dockWidget.labelResult.setText(f"Слой <{self.inters_layer.name()}>.\n"
-                                                    f"Результат отбора по общим объектам в слое <{layer_by_percent.name()}>.\n"
-                                                    f"(Id объекта: {current_feature_id}. Длина объекта: {current_feature_length}) м.")
-            else: # если сравнение по длине
-                self.dockWidget.labelResult.setText(f"Слой <{self.inters_layer.name()}>.\n"
-                                                    f"Результат отбора по длине пересечений.\n"
-                                                    f"(Id объекта: {current_feature_id}. Длина объекта: {current_feature_length} м.)")
 
             # генерация фильтра для получения всех объектов слоя
             filter_expression = self.generateFilterExpression(filters_dict)
             if filter_expression:
                 expr = QgsExpression(filter_expression)
                 request = QgsFeatureRequest(expr)
-                inters_layer_features = list(self.inters_layer.getFeatures(request))
+                current_layer_features = list(self.current_layer.getFeatures(request))
             else:
-                inters_layer_features = list(self.inters_layer.getFeatures())
-            fcnt = (len((inters_layer_features))) # общее число (отфильтрованных) объектов в слое
+                current_layer_features = list(self.current_layer.getFeatures())
 
-            for idx, intfeat in enumerate(inters_layer_features):
-                if intfeat.id() == current_feature_id and self.current_layer == self.inters_layer: #отсекаем сравниваемую линию
-                    continue
-                if intfeat.geometry().intersects(current_feature_buf):
-                    task.setProgress(idx/float(fcnt)*100)
-                    if task.isCanceled():
-                        self.stopped(task)
-                        return
+            il_objects_result_dict = {} # конечный результат отобранных пересекаемых объектов
+            il_fields_aliases_dict = self.current_layer.attributeAliases() # алиасы полей слоя
+            additional_layers = self.getAdditionalLayerData() # дополнительные пересекаемые слои (для вычисления количества общих пересечений)
+            fcnt = (len((current_layer_features))) # общее число (отфильтрованных) объектов в слое
 
-                    intfeat_buffer = intfeat.geometry().buffer(buffer_size, 5) # буфер пересекающихся линий, для отображения пересечений
-                    intersection_buffer = QgsGeometry(intfeat_buffer).intersection(current_feature_buf) # для отображения пересечений
-                    intersection_line = QgsGeometry(intfeat.geometry()).intersection(current_feature_buf) # части текущей линии, которые попали в буфер сравниваемого объекта
+            if layer_by_percent: # если сравнение по общим объектам дополнительного слоя
+                self.dockWidget.labelResult.setText(f"Слой <{self.current_layer.name()}>.\n"
+                                                    f"Результат отбора по общим объектам в слое <{layer_by_percent.name()}>.\n"
+                                                    )
+            else: # если сравнение по длине
+                self.dockWidget.labelResult.setText(f"Слой <{self.current_layer.name()}>.\n"
+                                                    f"Результат отбора по длине пересечений.\n"
+                                                    )
 
-                    intfeat_length = intfeat.geometry().length()
-                    intersection_line_length = intersection_line.length()
-                    attrs_add_layers_for_intfeat = None # Количество пересекаемых объектов из дополнительных слоев
-                    attrs_add_layers_for_intersection = None # Количество общих пересекаемых объектов из дополнительных слоев
+            for i, curfeat in enumerate(current_layer_features):
+                curfeat_inters_list = []
+                current_feature_id = curfeat.id()
+                current_feature_geom = curfeat.geometry()
+                current_feature_length = round(current_feature_geom.length(), 2)
+                current_feature_buf = current_feature_geom.buffer(buffer_size, 5)
+                task.setProgress(i/float(fcnt)*100)
 
-                    
-                    if layer_by_percent: # если сравнивать по общим пересекаемыым объектам, а не по длине
-                        attrs_add_layers_for_intfeat = self.getAdditionalLayersAttrs(
-                                                                additional_layers,
-                                                                intfeat.geometry(),
-                                                                'Объекты в ')
-                        attrs_add_layers_for_intersection = self.getAdditionalLayersAttrs(
-                                                                additional_layers,
-                                                                intersection_line,
-                                                                'Общее в ')
-                        cnt_intfeat_by_layer = attrs_add_layers_for_intfeat['Объекты в '+layer_by_percent.name()]
-                        cnt_intersection_by_layer = attrs_add_layers_for_intersection['Общее в '+layer_by_percent.name()]
+                for idx, intfeat in enumerate(current_layer_features):
+                    if intfeat.id() == current_feature_id: #отсекаем сравниваемую линию
+                        continue
+                    if intfeat.geometry().intersects(current_feature_buf):
 
-                        if cnt_intfeat_by_layer == 0:
-                            result_percent_inters = 0
-                        else:
-                            result_percent_inters = (cnt_intersection_by_layer/cnt_intfeat_by_layer)*100
-                    else: # если сравнивать по длине
-                        # процент - отношение длины пересечения к длине пересекаемого пути
-                        result_percent_inters = (intersection_line_length/intfeat_length) * 100 
+                        if task.isCanceled():
+                            self.stopped(task)
+                            return
 
-                    if result_percent_inters >= percent_inters:
-                        attrs_sys = {
-                            "feature_id": intfeat.id(),
-                            "WKT_inters_feature": intfeat.geometry().asWkt(),
-                            "WKT_intersection_line": intersection_line.asWkt()
-                        }
-                        attrs_calculated = {
-                            "Длина объекта": round(intfeat_length, 2),
-                            "Длина пересечения": round(intersection_line_length, 2),
-                            "Процент пересечения": round(result_percent_inters, 2)
-                        }
-                        attrs_feature_layer = self.getDictFeaturesAttributes(intfeat, il_fields_aliases_dict)
+                        intersection_line = QgsGeometry(intfeat.geometry()).intersection(current_feature_buf) # части текущей линии, которые попали в буфер сравниваемого объекта
+                        intfeat_length = intfeat.geometry().length()
+                        intersection_line_length = intersection_line.length()
+                        attrs_add_layers_for_intfeat = None # Количество пересекаемых объектов из дополнительных слоев
+                        attrs_add_layers_for_intersection = None # Количество общих пересекаемых объектов из дополнительных слоев
 
-                        if not attrs_add_layers_for_intfeat:
+                        
+                        if layer_by_percent: # если сравнивать по общим пересекаемыым объектам, а не по длине
                             attrs_add_layers_for_intfeat = self.getAdditionalLayersAttrs(
-                                                                additional_layers,
-                                                                intfeat.geometry(), 
-                                                                'Объекты в ')
-                        if not attrs_add_layers_for_intersection:
+                                                                    additional_layers,
+                                                                    intfeat.geometry(),
+                                                                    'Объекты в ')
                             attrs_add_layers_for_intersection = self.getAdditionalLayersAttrs(
-                                                                additional_layers,
-                                                                intersection_line,
-                                                                'Общее в ')
-                        feat_attrs={}
-                        feat_attrs = {**attrs_sys,
-                                    **attrs_feature_layer,
-                                    **attrs_calculated,
-                                    **attrs_add_layers_for_intfeat,
-                                    **attrs_add_layers_for_intersection} # объединение высчитываемых атрибутов и атрибутов слоя (объекта)
+                                                                    additional_layers,
+                                                                    intersection_line,
+                                                                    'Общее в ')
+                            cnt_intfeat_by_layer = attrs_add_layers_for_intfeat['Объекты в '+layer_by_percent.name()]
+                            cnt_intersection_by_layer = attrs_add_layers_for_intersection['Общее в '+layer_by_percent.name()]
 
-                        il_objects_result_dict[intfeat.id()] = feat_attrs
-            il_objects_result_dict = OrderedDict(sorted(il_objects_result_dict.items(), 
-                                    key=lambda kv: kv[1]["Процент пересечения"], reverse=True))
-            self.setFilterLayer(self.inters_layer, list(il_objects_result_dict.keys()))
-            return il_objects_result_dict        
-        except Exception as E:
-            QgsMessageLog.logMessage(str(E), self.MESSAGE_CATEGORY, Qgis.Info)
+                            if cnt_intfeat_by_layer == 0:
+                                result_percent_inters = 0
+                            else:
+                                result_percent_inters = (cnt_intersection_by_layer/cnt_intfeat_by_layer)*100
+                        else: # если сравнивать по длине
+                            # процент - отношение длины пересечения к длине пересекаемого пути
+                            result_percent_inters = (intersection_line_length/intfeat_length) * 100 
+
+                        if result_percent_inters >= percent_inters:
+                            
+                            attrs_calculated = {
+                                "% пересечения": round(result_percent_inters, 2),
+                                "L объекта": round(intfeat_length, 2),
+                                "L пересечения": round(intersection_line_length, 2)
+                            }
+                            attrs_feature_layer = self.getDictFeaturesAttributes(intfeat, il_fields_aliases_dict)
+
+                            if not attrs_add_layers_for_intfeat:
+                                attrs_add_layers_for_intfeat = self.getAdditionalLayersAttrs(
+                                                                    additional_layers,
+                                                                    intfeat.geometry(), 
+                                                                    'Объекты в ')
+                            if not attrs_add_layers_for_intersection:
+                                attrs_add_layers_for_intersection = self.getAdditionalLayersAttrs(
+                                                                    additional_layers,
+                                                                    intersection_line,
+                                                                    'Общее в ')
+                            feat_attrs = {}
+                            feat_attrs = {**attrs_calculated,
+                                          **attrs_feature_layer,
+                                          **attrs_add_layers_for_intfeat,
+                                          **attrs_add_layers_for_intersection} # объединение высчитываемых атрибутов и атрибутов слоя (объекта)
+                            curfeat_inters_list.append(feat_attrs)
+
+
+                if len(curfeat_inters_list) > 0:
+
+                    curfeat_inters_list = sorted(curfeat_inters_list, key=lambda k: k['% пересечения'], reverse=True) 
+
+                    inters_list_strings = []
+                    for index, list_item_dict in enumerate(curfeat_inters_list):
+                        intlist = []
+                        for key, value in list_item_dict.items():
+                            intlist.append(f"[{key}]: {value}")
+                        dict_string = str(index+1) + ". " + ", ".join(intlist)
+                        inters_list_strings.append(dict_string)
+                    inters_list_string = "\n".join(inters_list_strings)
+
+                    attrs_inters = {"Пересечения": inters_list_string}
+
+                    attrs_sys = {
+                            "feature_id": current_feature_id,
+                            "WKT_current_feature": current_feature_geom.asWkt()
+                        }
+                    attrs_calculated = {
+                            "L объекта": round(current_feature_length, 2)
+                    }
+                    attrs_feature_layer = self.getDictFeaturesAttributes(curfeat, il_fields_aliases_dict)
+
+
+                    feat_attrs = {}
+                    feat_attrs = {**attrs_sys,
+                                **attrs_feature_layer,
+                                **attrs_calculated,
+                                **attrs_inters}
+
+                    il_objects_result_dict[curfeat.id()] = feat_attrs
+
+            return il_objects_result_dict
+
+        except Exception as e: 
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            print(exc_type, fname, exc_tb.tb_lineno)
+            message = f"{exc_tb.tb_lineno}, {str(e)},  {exc_type}, {fname}"
+            QgsMessageLog.logMessage(message, self.MESSAGE_CATEGORY, Qgis.Info)
 
 
     def generateFilterExpression(self, filters_dict):
@@ -502,16 +440,16 @@ class IntersectionWays:
             result_fields = self.settings_layer.get("result_fields")
             if result_fields is not None:
                 for rf in result_fields:
-                    field_idx = self.inters_layer.fields().indexFromName(rf)
+                    field_idx = self.current_layer.fields().indexFromName(rf)
                     if field_idx > -1:
                         field = fields_aliases_dict[rf] if fields_aliases_dict[rf] else rf
-                        value = CommonTools.representFieldValueByType(field_idx, self.inters_layer, intfeat[rf])
+                        value = CommonTools.representFieldValueByType(field_idx, self.current_layer, intfeat[rf])
                         feature_attributes[field] = value
                 return feature_attributes
         for key, value in fields_aliases_dict.items():
             field = value if value else key
-            field_idx = self.inters_layer.fields().indexFromName(key)
-            feature_attributes[field] = CommonTools.representFieldValueByType(field_idx, self.inters_layer, intfeat[key])
+            field_idx = self.current_layer.fields().indexFromName(key)
+            feature_attributes[field] = CommonTools.representFieldValueByType(field_idx, self.current_layer, intfeat[key])
         return feature_attributes
 
 
@@ -538,9 +476,10 @@ class IntersectionWays:
 
         table.setHorizontalHeaderLabels(headers_labels_list)
         table.resizeColumnsToContents()
+        table.resizeRowsToContents()
         table.setColumnHidden(0, True)
         table.setColumnHidden(1, True)
-        table.setColumnHidden(2, True)
+        table.setColumnHidden(2, False)
 
 
     def setFilterLayer(self, layer, features_ids=None):
