@@ -6,7 +6,7 @@
 name=Ways Calc
 qgisMinimumVersion=3.0
 description=ways calculator
-version=0.1
+version=2021.0316
 author=Zlatanov Evgeniy
 email=johnzet@yandex.ru
 
