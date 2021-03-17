@@ -75,6 +75,8 @@ class IntersectionAllWays:
         #highlights
         self.intersected_h_list = []
 
+        self.exclude_idx_copyresult = [1] # исключить поля при копировании результатов
+
         self.MESSAGE_CATEGORY = "IntersectionAllWays"
 
         self.onLoadModule()
@@ -99,28 +101,7 @@ class IntersectionAllWays:
 
 
     def copyResult(self):
-        table = self.dockWidget.tableResult
-        colcount = table.columnCount()
-        rowcount = table.rowCount()
-        rowStrings = []
-        rowStrings.append('"' + self.dockWidget.labelResult.text().replace('\n', ' ') + '"')
-        columns_idx_list = list(range(colcount))
-        del columns_idx_list[1:2]
-        headers = [table.horizontalHeaderItem(col).text() for col in columns_idx_list]
-        headers_row = '\t'.join('"' + item + '"' for item in headers)
-        rowStrings.append(headers_row)
-
-        for rowIndex in range(rowcount):
-            rowItemsStrings = []
-            for columnIndex in columns_idx_list:
-                item = table.item(rowIndex, columnIndex)
-                itemText = '""'
-                if item:
-                    itemText = '"' + item.text().replace('"', '""') + '"'
-                rowItemsStrings.append(itemText)
-            rowStrings.append('\t'.join(rowItemsStrings))
-        result_string = '\n'.join(rowStrings)
-        QApplication.clipboard().setText(result_string)
+        CommonTools.copyResult(self.dockWidget, self.exclude_idx_copyresult)
 
 
     def initSettings(self):

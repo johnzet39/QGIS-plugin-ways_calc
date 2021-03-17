@@ -78,6 +78,8 @@ class IntersectionWays:
         self.intersected_h_list = []
         self.intersection_h_list = []
 
+        self.exclude_idx_copyresult = [1,2] # исключить поля при копировании результатов
+
         self.MESSAGE_CATEGORY = "IntersectionWays"
 
         self.onLoadModule()
@@ -103,28 +105,7 @@ class IntersectionWays:
 
 
     def copyResult(self):
-        table = self.dockWidget.tableResult
-        colcount = table.columnCount()
-        rowcount = table.rowCount()
-        rowStrings = []
-        rowStrings.append('"' + self.dockWidget.labelResult.text().replace('\n', ' ') + '"')
-        columns_idx_list = list(range(colcount))
-        del columns_idx_list[1:3]
-        headers = [table.horizontalHeaderItem(col).text() for col in columns_idx_list]
-        headers_row = '\t'.join('"' + item + '"' for item in headers)
-        rowStrings.append(headers_row)
-
-        for rowIndex in range(rowcount):
-            rowItemsStrings = []
-            for columnIndex in columns_idx_list:
-                item = table.item(rowIndex, columnIndex)
-                itemText = '""'
-                if item:
-                    itemText = '"' + item.text().replace('"', '""') + '"'
-                rowItemsStrings.append(itemText)
-            rowStrings.append('\t'.join(rowItemsStrings))
-        result_string = '\n'.join(rowStrings)
-        QApplication.clipboard().setText(result_string)
+        CommonTools.copyResult(self.dockWidget, self.exclude_idx_copyresult)
 
 
     def initSettings(self):
@@ -469,8 +450,12 @@ class IntersectionWays:
                                     key=lambda kv: kv[1]["Процент пересечения"], reverse=True))
             self.setFilterLayer(self.inters_layer, list(il_objects_result_dict.keys()))
             return il_objects_result_dict        
-        except Exception as E:
-            QgsMessageLog.logMessage(str(E), self.MESSAGE_CATEGORY, Qgis.Info)
+        except Exception as e:
+            exc_type, exc_obj, exc_tb = os.system.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            print(exc_type, fname, exc_tb.tb_lineno)
+            message = f"{exc_tb.tb_lineno}, {str(e)},  {exc_type}, {fname}"
+            QgsMessageLog.logMessage(message, self.MESSAGE_CATEGORY, Qgis.Info)
 
 
     def generateFilterExpression(self, filters_dict):
@@ -538,6 +523,7 @@ class IntersectionWays:
 
         table.setHorizontalHeaderLabels(headers_labels_list)
         table.resizeColumnsToContents()
+        table.resizeRowsToContents()
         table.setColumnHidden(0, True)
         table.setColumnHidden(1, True)
         table.setColumnHidden(2, True)

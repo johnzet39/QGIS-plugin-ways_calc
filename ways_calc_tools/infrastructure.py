@@ -1,5 +1,5 @@
 from qgis.PyQt import QtWidgets
-from qgis.PyQt.QtWidgets import QTableWidgetItem, QListWidgetItem
+from qgis.PyQt.QtWidgets import QTableWidgetItem, QListWidgetItem, QApplication
 from qgis.PyQt.QtCore import Qt, QVariant
 
 class CommonTools:
@@ -16,6 +16,9 @@ class CommonTools:
 
     @staticmethod
     def representFieldValueByType(column_idx, layer, value):
+        if value is None:
+            return ''
+
         field_type = layer.editorWidgetSetup(column_idx).type()
 
         # подставляем значения в соответствии с заданными справочниками в виджетах
@@ -190,3 +193,30 @@ class CommonTools:
             elif widget.metaObject().className() == "QComboBox":
                 value = widget.currentData(Qt.UserRole)
         return value
+
+    @staticmethod
+    def copyResult(dockWidget, exclude_idx_copyresult):
+        table = dockWidget.tableResult
+        colcount = table.columnCount()
+        rowcount = table.rowCount()
+        rowStrings = []
+        rowStrings.append('"' + dockWidget.labelResult.text().replace('\n', ' ') + '"')
+        columns_idx_list = list(range(colcount))
+
+        for idx in (reversed(exclude_idx_copyresult)):
+            del columns_idx_list[idx]
+        headers = [table.horizontalHeaderItem(col).text() for col in columns_idx_list]
+        headers_row = '\t'.join('"' + item + '"' for item in headers)
+        rowStrings.append(headers_row)
+
+        for rowIndex in range(rowcount):
+            rowItemsStrings = []
+            for columnIndex in columns_idx_list:
+                item = table.item(rowIndex, columnIndex)
+                itemText = '""'
+                if item:
+                    itemText = '"' + item.text().replace('"', '""') + '"'
+                rowItemsStrings.append(itemText)
+            rowStrings.append('\t'.join(rowItemsStrings))
+        result_string = '\n'.join(rowStrings)
+        QApplication.clipboard().setText(result_string)

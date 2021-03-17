@@ -92,8 +92,9 @@
                         "period_id": {
                             "label": "Поколение",
                             "source_type": "own",
-                            "widget_type": "QComboBox",
+                            "widget_type": "QListWidget",
                             "widget_options":{
+                                "setSelectionMode": "3"
                             }
                         }
                     },
