@@ -81,7 +81,8 @@ class WaysCalc:
         #print "** INITIALIZING WaysCalc"
 
         self.pluginIsActive = False
-        self.dockwidget = None
+        self.dockwidget_inters_ways = None
+        self.dockwidget_inters_allways = None
         # self.settings = None
 
         self.IW = None #IntersectionWays
@@ -116,7 +117,7 @@ class WaysCalc:
 
         self.action_intersection = QAction(
                 QIcon(":/plugins/_Ways_calc/icon.png"),
-                u'Поиск пересечений линейных объектов',
+                u'Поиск пересечений для линейного объекта',
                 self.iface.mainWindow())
         self.action_initLayerWays = QAction(
                 u"Выбор слоя для поиска пересечений",
@@ -151,7 +152,14 @@ class WaysCalc:
     def onClosePlugin(self):
         """Cleanup necessary items here when plugin dockwidget is closed"""
         # disconnects
-        self.dockwidget.closingPlugin.disconnect(self.onClosePlugin)
+        try:
+            self.dockwidget_inters_ways.closingPlugin.disconnect(self.onClosePlugin)
+        except:
+            pass
+        try:
+            self.dockwidget_inters_allways.closingPlugin.disconnect(self.onClosePlugin)
+        except:
+            pass
         self.pluginIsActive = False
 
 
@@ -174,18 +182,33 @@ class WaysCalc:
             self.IW.onUnLoadModule()
 
 
-    def init_dock(self):
+    def init_dock_inters_ways(self, dock):
         """Run method that loads and starts the plugin"""
 
-        if not self.pluginIsActive:
-            self.pluginIsActive = True
-            if self.dockwidget == None:
-                self.dockwidget = WaysCalcDockWidget()
-            self.dockwidget.closingPlugin.connect(self.onClosePlugin)
+        # if not self.pluginIsActive:
+        self.pluginIsActive = True
+        if self.dockwidget_inters_ways == None:
+            self.dockwidget_inters_ways = WaysCalcDockWidget()
+            self.dockwidget_inters_ways.closingPlugin.connect(self.onClosePlugin)
 
-            self.iface.addDockWidget(Qt.RightDockWidgetArea, self.dockwidget)
-            self.dockwidget.hide()
-            self.dockwidget.setWindowTitle(u'WaysCalc')
+            self.iface.addDockWidget(Qt.RightDockWidgetArea, self.dockwidget_inters_ways)
+            self.dockwidget_inters_ways.hide()
+            self.dockwidget_inters_ways.setWindowTitle(u'WaysCalc: Поиск пересечений для линейного объекта')
+
+
+    def init_dock_inters_allways(self, dock):
+        """Run method that loads and starts the plugin"""
+
+        # if not self.pluginIsActive:
+        self.pluginIsActive = True
+        if self.dockwidget_inters_allways == None:
+            self.dockwidget_inters_allways = WaysCalcDockWidget()
+            self.dockwidget_inters_allways.closingPlugin.connect(self.onClosePlugin)
+
+            self.iface.addDockWidget(Qt.RightDockWidgetArea, self.dockwidget_inters_allways)
+            self.dockwidget_inters_allways.hide()
+            self.dockwidget_inters_allways.setWindowTitle(u'WaysCalc: Поиск пересечений всех линейных объектов')
+
 
 
     def onCurrentLayerChanged(self):
@@ -207,7 +230,7 @@ class WaysCalc:
 
     def run_intersection(self):
         self.toolButton.setDefaultAction(self.action_intersection)
-        self.init_dock()
+        self.init_dock_inters_ways(self.dockwidget_inters_ways)
         if self.IW is None:
             self.init_IW()
         if self.IW.checkLayers():    
@@ -219,16 +242,16 @@ class WaysCalc:
 
 
     def init_IW(self):
-        self.IW = IntersectionWays(self.iface, self.dockwidget)
+        self.IW = IntersectionWays(self.iface, self.dockwidget_inters_ways)
 
     #-------- END INTERSECTION WAYS---------------------------------------------
 
 
     def init_IAW(self):
-        self.IAW = IntersectionAllWays(self.iface, self.dockwidget)
+        self.IAW = IntersectionAllWays(self.iface, self.dockwidget_inters_allways)
 
     def run_allintersection(self):
-        self.init_dock()
+        self.init_dock_inters_allways(self.dockwidget_inters_allways)
         if self.IAW is None:
             self.init_IAW()
         self.IAW.showClickedFeaturesList()

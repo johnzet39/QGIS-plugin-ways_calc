@@ -102,7 +102,8 @@
                         "number",
                         "t_type",
                         "company",
-                        "period_id"
+                        "period_id",
+                        "arrow"
                     ],                   
                     "id_field": "gid"
                 }

@@ -502,6 +502,7 @@ class IntersectionWays:
 
     def populateTableResult(self, table, objects_dict):
         table.reset()
+        table.sortItems(-1)
         if not objects_dict:
             print("not found")
             return
